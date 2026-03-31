@@ -36,21 +36,31 @@ fn slugify(name: &str) -> String {
         .join("-")
 }
 
-fn save_icon(slug: &str, bytes: &[u8], share_dir: &Path) {
+fn save_icon(slug: &str, bytes: &[u8], format: ImageFormat, share_dir: &Path) -> Option<PathBuf> {
     let icons_dir = share_dir.join("icons");
     std::fs::create_dir_all(&icons_dir)
         .unwrap_or_else(|_| panic!("Error making directory: {}!", icons_dir.display()));
 
-    let icon_path = icons_dir.join(format!("{}.png", slug));
-    std::fs::write(icon_path, bytes).expect("Error writing image bytes to file!");
+    let extension = match format {
+        ImageFormat::Png | ImageFormat::Unknown => "png",
+        ImageFormat::Svg => "svg",
+    };
+
+    let icon_path = icons_dir.join(format!("{}.{}", slug, extension));
+    match std::fs::write(&icon_path, bytes) {
+        Ok(()) => Some(icon_path),
+        Err(_) => {
+            println!("Error writing image bytes to file!");
+            None
+        }
+    }
 }
 
-fn create_desktop_file(name: &str, slug: &str, url: &str, share_dir: &Path) {
+fn create_desktop_file(name: &str, slug: &str, icon_path: &Path, url: &str, share_dir: &Path) -> Option<PathBuf> {
     let applications_dir = share_dir.join("applications");
     std::fs::create_dir_all(&applications_dir)
         .unwrap_or_else(|_| panic!("Error making directory: {}!", applications_dir.display()));
 
-    let icon_path = share_dir.join("icons").join(format!("{}.png", slug));
     let desktop_file_path = applications_dir.join(format!("{}.desktop", slug));
     let contents = format!(
         "[Desktop Entry]
@@ -64,7 +74,13 @@ Categories=Network;",
         url,
         icon_path.display()
     );
-    std::fs::write(desktop_file_path, contents).expect("Error writing desktop file!");
+    match std::fs::write(&desktop_file_path, contents) {
+        Ok(()) => Some(desktop_file_path),
+        Err(_) => {
+            println!("Error writing desktop file!");
+            None
+        },
+    }
 }
 
 fn normalize_url(url: &str) -> String {
@@ -72,6 +88,22 @@ fn normalize_url(url: &str) -> String {
         String::from(url)
     } else {
         format!("https://{url}")
+    }
+}
+
+enum ImageFormat {
+    Png,
+    Svg,
+    Unknown,
+}
+
+fn detect_format(bytes: &[u8]) -> ImageFormat {
+    if bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
+        ImageFormat::Png
+    } else if bytes.starts_with(b"<svg") || bytes.starts_with(b"<?xml") {
+        ImageFormat::Svg
+    } else {
+        ImageFormat::Unknown
     }
 }
 
@@ -92,17 +124,28 @@ fn main() -> Result<(), Box<dyn Error>> {
     let slug = slugify(name);
 
     println!("Fetching favicon for {}...", url);
-    if let Some(bytes) = fetch_favicon(&url) {
-        println!("Favicon fetched successfully!");
-        save_icon(&slug, &bytes, &share_dir);
-        println!("Icon saved.")
+    let icon_path = if let Some(bytes) = fetch_favicon(&url) {
+        let icon_format = detect_format(&bytes);
+        match icon_format {
+            ImageFormat::Png | ImageFormat::Svg => {
+                println!("Favicon fetched successfully!");
+                save_icon(&slug, &bytes, icon_format, &share_dir)
+            }
+            ImageFormat::Unknown => {
+                println!("Wrong image format ... Installing with Default icon.");
+                save_icon(&slug, DEFAULT_ICON, icon_format, &share_dir)
+            }
+        }
     } else {
-        println!("Favicon not found :( ... Installing with Default icon.");
-        save_icon(&slug, DEFAULT_ICON, &share_dir);
+        println!("Favicon not found ... Installing with Default icon.");
+        save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir)
     }
+    .ok_or("Failed to save icon :(")?;
 
-    create_desktop_file(name, &slug, &url, &share_dir);
-    println!("Desktop file created.");
+    println!("Icon saved at: {}", icon_path.display());
+
+    let desktop_file_path = create_desktop_file(name, &slug, &icon_path, &url, &share_dir).ok_or("Failed to create Desktop file :(")?;
+    println!("Desktop file created at: {}", desktop_file_path.display());
 
     println!("✓ {} installed successfully!", name);
 
