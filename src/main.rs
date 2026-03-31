@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 const DEFAULT_ICON: &[u8] = include_bytes!("../assets/default.png");
@@ -36,6 +37,12 @@ fn slugify(name: &str) -> String {
         .join("-")
 }
 
+fn get_desktop_file_path(slug: &str, share_dir: &Path) -> PathBuf {
+    share_dir
+        .join("applications")
+        .join(format!("{}.desktop", slug))
+}
+
 fn save_icon(slug: &str, bytes: &[u8], format: ImageFormat, share_dir: &Path) -> Option<PathBuf> {
     let icons_dir = share_dir.join("icons");
     std::fs::create_dir_all(&icons_dir)
@@ -56,12 +63,11 @@ fn save_icon(slug: &str, bytes: &[u8], format: ImageFormat, share_dir: &Path) ->
     }
 }
 
-fn create_desktop_file(name: &str, slug: &str, icon_path: &Path, url: &str, share_dir: &Path) -> Option<PathBuf> {
-    let applications_dir = share_dir.join("applications");
-    std::fs::create_dir_all(&applications_dir)
+fn create_desktop_file(name: &str, icon_path: &Path, url: &str, desktop_file_path: &Path) {
+    let applications_dir = &desktop_file_path.parent().unwrap();
+    std::fs::create_dir_all(applications_dir)
         .unwrap_or_else(|_| panic!("Error making directory: {}!", applications_dir.display()));
 
-    let desktop_file_path = applications_dir.join(format!("{}.desktop", slug));
     let contents = format!(
         "[Desktop Entry]
 Name={}
@@ -74,13 +80,8 @@ Categories=Network;",
         url,
         icon_path.display()
     );
-    match std::fs::write(&desktop_file_path, contents) {
-        Ok(()) => Some(desktop_file_path),
-        Err(_) => {
-            println!("Error writing desktop file!");
-            None
-        },
-    }
+
+    std::fs::write(desktop_file_path, contents).expect("Error writing desktop file!");
 }
 
 fn normalize_url(url: &str) -> String {
@@ -118,10 +119,24 @@ fn main() -> Result<(), Box<dyn Error>> {
     let url = normalize_url(&args[1]);
     let name = &args[2];
 
-    println!("Installing {} from {}", name, url);
-
     let share_dir = get_share_dir()?;
     let slug = slugify(name);
+
+    let desktop_file_path = get_desktop_file_path(&slug, &share_dir);
+    if desktop_file_path.exists() {
+        print!("{} is already installed. Overwrite? [y/N] ", &name);
+        Write::flush(&mut io::stdout()).ok();
+
+        let mut buffer = String::new();
+        let _ = io::stdin().read_line(&mut buffer);
+
+        let input = buffer.trim();
+        if input != "y" && input != "Y" {
+            std::process::exit(0);
+        }
+    }
+
+    println!("Installing {} from {}", name, url);
 
     println!("Fetching favicon for {}...", url);
     let icon_path = if let Some(bytes) = fetch_favicon(&url) {
@@ -144,7 +159,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("Icon saved at: {}", icon_path.display());
 
-    let desktop_file_path = create_desktop_file(name, &slug, &icon_path, &url, &share_dir).ok_or("Failed to create Desktop file :(")?;
+    create_desktop_file(name, &icon_path, &url, &desktop_file_path);
     println!("Desktop file created at: {}", desktop_file_path.display());
 
     println!("✓ {} installed successfully!", name);
