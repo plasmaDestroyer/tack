@@ -67,6 +67,14 @@ Categories=Network;",
     std::fs::write(desktop_file_path, contents).expect("Error writing desktop file!");
 }
 
+fn normalize_url(url: &str) -> String {
+    if url.starts_with("http://") || url.starts_with("https://") {
+        String::from(url)
+    } else {
+        format!("https://{url}")
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().collect();
 
@@ -75,7 +83,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         std::process::exit(1);
     }
 
-    let url = &args[1];
+    let url = normalize_url(&args[1]);
     let name = &args[2];
 
     println!("Installing {} from {}", name, url);
@@ -84,7 +92,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let slug = slugify(name);
 
     println!("Fetching favicon for {}...", url);
-    if let Some(bytes) = fetch_favicon(url) {
+    if let Some(bytes) = fetch_favicon(&url) {
         println!("Favicon fetched successfully!");
         save_icon(&slug, &bytes, &share_dir);
         println!("Icon saved.")
@@ -93,7 +101,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         save_icon(&slug, DEFAULT_ICON, &share_dir);
     }
 
-    create_desktop_file(name, &slug, url, &share_dir);
+    create_desktop_file(name, &slug, &url, &share_dir);
     println!("Desktop file created.");
 
     println!("✓ {} installed successfully!", name);
