@@ -1,3 +1,6 @@
+use std::path::{Path, PathBuf};
+use std::error::Error;
+
 const DEFAULT_ICON: &[u8] = include_bytes!("../assets/default.png");
 
 fn fetch_favicon(url: &str) -> Option<Vec<u8>> {
@@ -12,12 +15,17 @@ fn fetch_favicon(url: &str) -> Option<Vec<u8>> {
     }
 }
 
-fn get_share_dir() -> std::path::PathBuf {
-    let home_directory = std::env::var("HOME").expect("Home directory not found!");
-    std::path::PathBuf::from(home_directory).join(".local/share/")
+fn get_share_dir() -> Result<PathBuf, Box<dyn Error>> {
+    if let Ok(home_directory) = std::env::var("XDG_DATA_HOME") {
+        return Ok(PathBuf::from(home_directory));
+    } else if let Ok(home_directory) = std::env::var("HOME") {
+        return Ok(PathBuf::from(home_directory).join(".local/share/"));
+    } else {
+        return Err("Could not find home directory!".into());
+    }
 }
 
-fn save_icon(name: &str, bytes: &[u8], share_dir: &std::path::Path) {
+fn save_icon(name: &str, bytes: &[u8], share_dir: &Path) {
     let icons_dir = share_dir.join("icons");
     std::fs::create_dir_all(&icons_dir)
         .unwrap_or_else(|_| panic!("Error making directory: {}!", icons_dir.display()));
@@ -26,7 +34,7 @@ fn save_icon(name: &str, bytes: &[u8], share_dir: &std::path::Path) {
     std::fs::write(icon_path, bytes).expect("Error writing image bytes to file!");
 }
 
-fn create_desktop_file(name: &str, url: &str, share_dir: &std::path::Path) {
+fn create_desktop_file(name: &str, url: &str, share_dir: &Path) {
     let applications_dir = share_dir.join("applications");
     std::fs::create_dir_all(&applications_dir)
         .unwrap_or_else(|_| panic!("Error making directory: {}!", applications_dir.display()));
@@ -47,7 +55,7 @@ Categories=Network;",
     std::fs::write(desktop_file_path, contents).expect("Error writing desktop file!");
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().collect();
 
     if args.len() < 3 {
@@ -60,7 +68,7 @@ fn main() {
 
     println!("Installing {} from {}", name, url);
 
-    let share_dir = get_share_dir();
+    let share_dir = get_share_dir()?;
 
     println!("Fetching favicon for {}...", url);
     if let Some(bytes) = fetch_favicon(url) {
@@ -76,4 +84,6 @@ fn main() {
     println!("Desktop file created.");
 
     println!("✓ {} installed successfully!", name);
+
+    Ok(())
 }
