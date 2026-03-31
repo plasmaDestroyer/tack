@@ -49,7 +49,7 @@ fn save_icon(slug: &str, bytes: &[u8], format: ImageFormat, share_dir: &Path) ->
         .unwrap_or_else(|_| panic!("Error making directory: {}!", icons_dir.display()));
 
     let extension = match format {
-        ImageFormat::Png | ImageFormat::Unknown => "png",
+        ImageFormat::Png => "png",
         ImageFormat::Svg => "svg",
     };
 
@@ -63,8 +63,8 @@ fn save_icon(slug: &str, bytes: &[u8], format: ImageFormat, share_dir: &Path) ->
     }
 }
 
-fn create_desktop_file(name: &str, icon_path: &Path, url: &str, desktop_file_path: &Path) {
-    let applications_dir = &desktop_file_path.parent().unwrap();
+fn create_desktop_file(name: &str, icon_path: &Path, url: &str, desktop_file_path: &Path) -> Result<(), Box<dyn Error>> {
+    let applications_dir = &desktop_file_path.parent().ok_or("Invalid desktop file path")?;
     std::fs::create_dir_all(applications_dir)
         .unwrap_or_else(|_| panic!("Error making directory: {}!", applications_dir.display()));
 
@@ -81,7 +81,9 @@ Categories=Network;",
         icon_path.display()
     );
 
-    std::fs::write(desktop_file_path, contents).expect("Error writing desktop file!");
+    std::fs::write(desktop_file_path, contents)?;
+
+    Ok(())
 }
 
 fn normalize_url(url: &str) -> String {
@@ -95,16 +97,15 @@ fn normalize_url(url: &str) -> String {
 enum ImageFormat {
     Png,
     Svg,
-    Unknown,
 }
 
-fn detect_format(bytes: &[u8]) -> ImageFormat {
+fn detect_format(bytes: &[u8]) -> Option<ImageFormat> {
     if bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
-        ImageFormat::Png
+        Some(ImageFormat::Png)
     } else if bytes.starts_with(b"<svg") || bytes.starts_with(b"<?xml") {
-        ImageFormat::Svg
+        Some(ImageFormat::Svg)
     } else {
-        ImageFormat::Unknown
+        None
     }
 }
 
@@ -140,16 +141,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("Fetching favicon for {}...", url);
     let icon_path = if let Some(bytes) = fetch_favicon(&url) {
-        let icon_format = detect_format(&bytes);
-        match icon_format {
-            ImageFormat::Png | ImageFormat::Svg => {
-                println!("Favicon fetched successfully!");
-                save_icon(&slug, &bytes, icon_format, &share_dir)
-            }
-            ImageFormat::Unknown => {
-                println!("Wrong image format ... Installing with Default icon.");
-                save_icon(&slug, DEFAULT_ICON, icon_format, &share_dir)
-            }
+        if let Some(icon_format) = detect_format(&bytes) {
+            println!("Favicon fetched successfully!");
+            save_icon(&slug, &bytes, icon_format, &share_dir)
+        } else {
+            println!("Wrong image format ... Installing with Default icon.");
+            save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir)
         }
     } else {
         println!("Favicon not found ... Installing with Default icon.");
@@ -159,7 +156,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("Icon saved at: {}", icon_path.display());
 
-    create_desktop_file(name, &icon_path, &url, &desktop_file_path);
+    create_desktop_file(name, &icon_path, &url, &desktop_file_path)?;
     println!("Desktop file created at: {}", desktop_file_path.display());
 
     println!("✓ {} installed successfully!", name);
