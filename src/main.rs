@@ -43,10 +43,14 @@ fn get_desktop_file_path(slug: &str, share_dir: &Path) -> PathBuf {
         .join(format!("{}.desktop", slug))
 }
 
-fn save_icon(slug: &str, bytes: &[u8], format: ImageFormat, share_dir: &Path) -> Option<PathBuf> {
+fn save_icon(
+    slug: &str,
+    bytes: &[u8],
+    format: ImageFormat,
+    share_dir: &Path,
+) -> Result<PathBuf, Box<dyn Error>> {
     let icons_dir = share_dir.join("icons");
-    std::fs::create_dir_all(&icons_dir)
-        .unwrap_or_else(|_| panic!("Error making directory: {}!", icons_dir.display()));
+    std::fs::create_dir_all(&icons_dir)?;
 
     let extension = match format {
         ImageFormat::Png => "png",
@@ -54,19 +58,20 @@ fn save_icon(slug: &str, bytes: &[u8], format: ImageFormat, share_dir: &Path) ->
     };
 
     let icon_path = icons_dir.join(format!("{}.{}", slug, extension));
-    match std::fs::write(&icon_path, bytes) {
-        Ok(()) => Some(icon_path),
-        Err(_) => {
-            println!("Error writing image bytes to file!");
-            None
-        }
-    }
+    std::fs::write(&icon_path, bytes)?;
+    Ok(icon_path)
 }
 
-fn create_desktop_file(name: &str, icon_path: &Path, url: &str, desktop_file_path: &Path) -> Result<(), Box<dyn Error>> {
-    let applications_dir = &desktop_file_path.parent().ok_or("Invalid desktop file path")?;
-    std::fs::create_dir_all(applications_dir)
-        .unwrap_or_else(|_| panic!("Error making directory: {}!", applications_dir.display()));
+fn create_desktop_file(
+    name: &str,
+    icon_path: &Path,
+    url: &str,
+    desktop_file_path: &Path,
+) -> Result<(), Box<dyn Error>> {
+    let applications_dir = &desktop_file_path
+        .parent()
+        .ok_or("Invalid desktop file path")?;
+    std::fs::create_dir_all(applications_dir)?;
 
     let contents = format!(
         "[Desktop Entry]
@@ -151,8 +156,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else {
         println!("Favicon not found ... Installing with Default icon.");
         save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir)
-    }
-    .ok_or("Failed to save icon :(")?;
+    }?;
 
     println!("Icon saved at: {}", icon_path.display());
 
