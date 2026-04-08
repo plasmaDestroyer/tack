@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const DEFAULT_ICON: &[u8] = include_bytes!("../assets/default.png");
 
@@ -104,6 +106,49 @@ enum ImageFormat {
     Svg,
 }
 
+#[derive(Serialize, Deserialize)]
+struct AppEntry {
+    name: String,
+    slug: String,
+    url: String,
+    browser: String,
+    icon_path: String,
+    installed_at: u64,
+}
+
+fn get_manifest_path(share_dir: &Path) -> PathBuf {
+    share_dir.join("tack").join("apps.json")
+}
+
+fn load_manifest(path: &Path) -> Result<Vec<AppEntry>, Box<dyn Error>> {
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let contents = std::fs::read_to_string(path)?;
+    let entries: Vec<AppEntry> = serde_json::from_str(&contents)?;
+    Ok(entries)
+}
+
+fn save_manifest(path: &Path, entries: &[AppEntry]) -> Result<(), Box<dyn Error>> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let json = serde_json::to_string_pretty(entries)?;
+    std::fs::write(path, json)?;
+    Ok(())
+}
+
+fn add_or_update_app(manifest_path: &Path, entry: AppEntry) -> Result<(), Box<dyn Error>> {
+    let mut entries = load_manifest(manifest_path)?;
+    if let Some(existing) = entries.iter_mut().find(|e| e.slug == entry.slug) {
+        *existing = entry;
+    } else {
+        entries.push(entry);
+    }
+    save_manifest(manifest_path, &entries)?;
+    Ok(())
+}
+
 fn detect_format(bytes: &[u8]) -> Option<ImageFormat> {
     if bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
         Some(ImageFormat::Png)
@@ -162,6 +207,18 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     create_desktop_file(name, &icon_path, &url, &desktop_file_path)?;
     println!("Desktop file created at: {}", desktop_file_path.display());
+
+    let manifest_path = get_manifest_path(&share_dir);
+    let entry = AppEntry {
+        name: name.to_string(),
+        slug: slug.clone(),
+        url: url.clone(),
+        browser: String::from("chromium"),
+        icon_path: icon_path.display().to_string(),
+        installed_at: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+    };
+    add_or_update_app(&manifest_path, entry)?;
+    println!("Manifest updated at: {}", manifest_path.display());
 
     println!("✓ {} installed successfully!", name);
 
