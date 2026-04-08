@@ -4,15 +4,17 @@
 
 ## How it works
 
-`tack` takes a website URL and a name, and automatically sets up a desktop application for it. It fetches the website's favicon, saves it to your system icons directory, and generates a `.desktop` file that launches the website using Chromium in a standalone app window.
+`tack` takes a website URL and a name, and automatically sets up a desktop application for it. It fetches the website's favicon (supporting `.png` and `.svg` formats), saves it to your system icons directory, and generates a `.desktop` file that launches the website using Chromium in a standalone app window. All installed applications are tracked in a metadata manifest.
 
 ## Usage
 
 ```bash
 tack <url> <name>
+tack list
+tack remove <name>
 ```
 
-### Example
+### Install an App
 
 To install YouTube as a desktop app:
 
@@ -20,7 +22,25 @@ To install YouTube as a desktop app:
 tack https://youtube.com YouTube
 ```
 
-This will create a "YouTube" application in your app launcher.
+This will create a "YouTube" application in your app launcher. `tack` will normalize URLs (adding `https://` if missing), sanitize app names, and prompt you if an application with the same name is already installed.
+
+### List Installed Apps
+
+To list all applications currently installed and managed by `tack`:
+
+```bash
+tack list
+```
+
+### Remove an App
+
+To remove an installed application:
+
+```bash
+tack remove YouTube
+```
+
+This removes the `.desktop` file, the saved icon, and the app's entry from the manifest.
 
 ## Requirements
 
@@ -41,8 +61,9 @@ cargo build --release
 
 ## What it creates
 
-- `~/.local/share/applications/<name>.desktop`
-- `~/.local/share/icons/<name>.png`
+- `~/.local/share/applications/<slug>.desktop`
+- `~/.local/share/icons/<slug>.{png,svg}`
+- `~/.local/share/tack/apps.json` (apps tracking manifest)
 
 ## License
 
