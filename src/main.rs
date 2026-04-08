@@ -149,6 +149,66 @@ fn add_or_update_app(manifest_path: &Path, entry: AppEntry) -> Result<(), Box<dy
     Ok(())
 }
 
+fn list_apps(share_dir: &Path) -> Result<(), Box<dyn Error>> {
+    let manifest_path = get_manifest_path(share_dir);
+    let entries = load_manifest(&manifest_path)?;
+
+    if entries.is_empty() {
+        println!("No apps installed yet.");
+        return Ok(());
+    }
+
+    // Calculate column widths
+    let name_width = entries
+        .iter()
+        .map(|e| e.name.len())
+        .max()
+        .unwrap_or(4)
+        .max(4);
+    let url_width = entries
+        .iter()
+        .map(|e| e.url.len())
+        .max()
+        .unwrap_or(3)
+        .max(3);
+    let browser_width = entries
+        .iter()
+        .map(|e| e.browser.len())
+        .max()
+        .unwrap_or(7)
+        .max(7);
+    let icon_width = entries
+        .iter()
+        .map(|e| e.icon_path.len())
+        .max()
+        .unwrap_or(4)
+        .max(4);
+
+    // Header
+    println!(
+        "{:<name_width$}  {:<url_width$}  {:<browser_width$}  {:<icon_width$}",
+        "Name", "URL", "Browser", "Icon",
+    );
+    println!(
+        "{:<name_width$}  {:<url_width$}  {:<browser_width$}  {:<icon_width$}",
+        "─".repeat(name_width),
+        "─".repeat(url_width),
+        "─".repeat(browser_width),
+        "─".repeat(icon_width),
+    );
+
+    // Rows
+    for entry in &entries {
+        println!(
+            "{:<name_width$}  {:<url_width$}  {:<browser_width$}  {:<icon_width$}",
+            entry.name, entry.url, entry.browser, entry.icon_path,
+        );
+    }
+
+    println!("\n{} app(s) installed.", entries.len());
+    Ok(())
+}
+
 fn detect_format(bytes: &[u8]) -> Option<ImageFormat> {
     if bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
         Some(ImageFormat::Png)
@@ -159,23 +219,15 @@ fn detect_format(bytes: &[u8]) -> Option<ImageFormat> {
     }
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let args: Vec<String> = std::env::args().collect();
-
-    if args.len() < 3 {
-        eprintln!("Usage: tack <url> <name>");
-        std::process::exit(1);
-    }
-
-    let url = normalize_url(&args[1]);
-    let name = &args[2];
+fn install_app(url: &str, name: &str) -> Result<(), Box<dyn Error>> {
+    let url = normalize_url(url);
 
     let share_dir = get_share_dir()?;
     let slug = slugify(name);
 
     let desktop_file_path = get_desktop_file_path(&slug, &share_dir);
     if desktop_file_path.exists() {
-        print!("{} is already installed. Overwrite? [y/N] ", &name);
+        print!("{} is already installed. Overwrite? [y/N] ", name);
         Write::flush(&mut io::stdout()).ok();
 
         let mut buffer = String::new();
@@ -211,8 +263,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let manifest_path = get_manifest_path(&share_dir);
     let entry = AppEntry {
         name: name.to_string(),
-        slug: slug.clone(),
-        url: url.clone(),
+        slug,
+        url,
         browser: String::from("chromium"),
         icon_path: icon_path.display().to_string(),
         installed_at: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
@@ -221,6 +273,32 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Manifest updated at: {}", manifest_path.display());
 
     println!("✓ {} installed successfully!", name);
+
+    Ok(())
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let args: Vec<String> = std::env::args().collect();
+
+    if args.len() < 2 {
+        eprintln!("Usage: tack <url> <name>");
+        eprintln!("       tack list");
+        std::process::exit(1);
+    }
+
+    match args[1].as_str() {
+        "list" => {
+            let share_dir = get_share_dir()?;
+            list_apps(&share_dir)?;
+        }
+        _ => {
+            if args.len() < 3 {
+                eprintln!("Usage: tack <url> <name>");
+                std::process::exit(1);
+            }
+            install_app(&args[1], &args[2])?;
+        }
+    }
 
     Ok(())
 }
