@@ -68,6 +68,7 @@ fn create_desktop_file(
     name: &str,
     icon_path: &Path,
     url: &str,
+    browser: &str,
     desktop_file_path: &Path,
 ) -> Result<(), Box<dyn Error>> {
     let applications_dir = &desktop_file_path
@@ -78,12 +79,13 @@ fn create_desktop_file(
     let contents = format!(
         "[Desktop Entry]
 Name={}
-Exec=chromium --app={}
+Exec={} --app={}
 Icon={}
 Type=Application
 Terminal=false
 Categories=Network;",
         name,
+        browser,
         url,
         icon_path.display()
     );
@@ -252,6 +254,129 @@ fn remove_app(name: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[derive(Default)]
+struct UpdateFlags {
+    icon: Option<String>,
+    url: Option<String>,
+    browser: Option<String>,
+    name: Option<String>,
+}
+
+fn parse_update_flags(args: &[String]) -> Result<UpdateFlags, Box<dyn Error>> {
+    let mut flags = UpdateFlags::default();
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--icon" => {
+                let val = args
+                    .get(i + 1)
+                    .ok_or("--icon requires a value")?;
+                flags.icon = Some(val.clone());
+                i += 2;
+            }
+            "--url" => {
+                let val = args
+                    .get(i + 1)
+                    .ok_or("--url requires a value")?;
+                flags.url = Some(val.clone());
+                i += 2;
+            }
+            "--browser" => {
+                let val = args
+                    .get(i + 1)
+                    .ok_or("--browser requires a value")?;
+                flags.browser = Some(val.clone());
+                i += 2;
+            }
+            "--name" => {
+                let val = args
+                    .get(i + 1)
+                    .ok_or("--name requires a value")?;
+                flags.name = Some(val.clone());
+                i += 2;
+            }
+            other => {
+                return Err(format!("Unknown flag: {}", other).into());
+            }
+        }
+    }
+    Ok(flags)
+}
+
+fn update_app(current_name: &str, flags: UpdateFlags) -> Result<(), Box<dyn Error>> {
+    let share_dir = get_share_dir()?;
+    let slug = slugify(current_name);
+    let manifest_path = get_manifest_path(&share_dir);
+    let mut entries = load_manifest(&manifest_path)?;
+
+    let entry = entries
+        .iter_mut()
+        .find(|e| e.slug == slug)
+        .ok_or_else(|| format!("App '{}' is not installed.", current_name))?;
+
+    let has_overrides =
+        flags.icon.is_some() || flags.url.is_some() || flags.browser.is_some() || flags.name.is_some();
+
+    // Apply field overrides
+    if let Some(new_url) = &flags.url {
+        entry.url = normalize_url(new_url);
+    }
+    if let Some(new_browser) = &flags.browser {
+        entry.browser = new_browser.clone();
+    }
+    if let Some(new_name) = &flags.name {
+        entry.name = new_name.clone();
+    }
+
+    // Handle icon: explicit --icon flag, or repair-mode re-fetch
+    if let Some(icon_arg) = &flags.icon {
+        let icon_path_buf = PathBuf::from(icon_arg);
+        if icon_path_buf.exists() {
+            // User supplied a local file
+            let bytes = std::fs::read(&icon_path_buf)?;
+            let format = detect_format(&bytes)
+                .ok_or("Unsupported icon format (expected PNG or SVG)")?;
+            let saved = save_icon(&slug, &bytes, format, &share_dir)?;
+            println!("Icon saved at: {}", saved.display());
+            entry.icon_path = saved.display().to_string();
+        } else {
+            return Err(format!("Icon file not found: {}", icon_arg).into());
+        }
+    } else if !has_overrides {
+        // Repair mode: re-fetch favicon from the app's URL
+        println!("Repair mode: re-fetching favicon for {}...", entry.url);
+        let icon_path = if let Some(bytes) = fetch_favicon(&entry.url) {
+            if let Some(icon_format) = detect_format(&bytes) {
+                println!("Favicon fetched successfully!");
+                save_icon(&slug, &bytes, icon_format, &share_dir)
+            } else {
+                println!("Wrong image format ... restoring default icon.");
+                save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir)
+            }
+        } else {
+            println!("Favicon not found ... restoring default icon.");
+            save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir)
+        }?;
+        println!("Icon saved at: {}", icon_path.display());
+        entry.icon_path = icon_path.display().to_string();
+    }
+
+    // Rewrite .desktop file
+    let desktop_file_path = get_desktop_file_path(&slug, &share_dir);
+    let icon_path = PathBuf::from(&entry.icon_path);
+    create_desktop_file(&entry.name, &icon_path, &entry.url, &entry.browser, &desktop_file_path)?;
+    println!("Desktop file updated at: {}", desktop_file_path.display());
+
+    let final_name = entry.name.clone();
+
+    // Persist manifest
+    save_manifest(&manifest_path, &entries)?;
+    println!("Manifest updated at: {}", manifest_path.display());
+
+    println!("✓ {} updated successfully!", final_name);
+    Ok(())
+}
+
 fn detect_format(bytes: &[u8]) -> Option<ImageFormat> {
     if bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
         Some(ImageFormat::Png)
@@ -300,7 +425,7 @@ fn install_app(url: &str, name: &str) -> Result<(), Box<dyn Error>> {
 
     println!("Icon saved at: {}", icon_path.display());
 
-    create_desktop_file(name, &icon_path, &url, &desktop_file_path)?;
+    create_desktop_file(name, &icon_path, &url, "chromium", &desktop_file_path)?;
     println!("Desktop file created at: {}", desktop_file_path.display());
 
     let manifest_path = get_manifest_path(&share_dir);
@@ -327,6 +452,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         eprintln!("Usage: tack <url> <name>");
         eprintln!("       tack list");
         eprintln!("       tack remove <name>");
+        eprintln!("       tack update <name> [--name NAME] [--url URL] [--browser BROWSER] [--icon PATH]");
         std::process::exit(1);
     }
 
@@ -341,6 +467,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 std::process::exit(1);
             }
             remove_app(&args[2])?;
+        }
+        "update" => {
+            if args.len() < 3 {
+                eprintln!("Usage: tack update <name> [--name NAME] [--url URL] [--browser BROWSER] [--icon PATH]");
+                std::process::exit(1);
+            }
+            let flags = parse_update_flags(&args[3..])?;
+            update_app(&args[2], flags)?;
         }
         _ => {
             if args.len() < 3 {
