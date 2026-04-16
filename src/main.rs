@@ -386,6 +386,26 @@ fn detect_format(bytes: &[u8]) -> Option<ImageFormat> {
     }
 }
 
+fn open_app(name: &str) -> Result<(), Box<dyn Error>> {
+    let share_dir = get_share_dir()?;
+    let slug = slugify(name);
+    let manifest_path = get_manifest_path(&share_dir);
+    let entries = load_manifest(&manifest_path)?;
+
+    let entry = entries
+        .iter()
+        .find(|e| e.slug == slug)
+        .ok_or_else(|| format!("App '{}' is not installed.", name))?;
+
+    println!("Opening {} ({})", entry.name, entry.url);
+
+    std::process::Command::new(&entry.browser)
+        .arg(format!("--app={}", entry.url))
+        .spawn()?;
+
+    Ok(())
+}
+
 fn install_app(url: &str, name: &str) -> Result<(), Box<dyn Error>> {
     let url = normalize_url(url);
 
@@ -442,6 +462,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if args.len() < 2 {
         eprintln!("Usage: tack <url> <name>");
         eprintln!("       tack list");
+        eprintln!("       tack open <name>");
         eprintln!("       tack remove <name>");
         eprintln!("       tack update <name> [--name NAME] [--url URL] [--browser BROWSER] [--icon PATH]");
         std::process::exit(1);
@@ -458,6 +479,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 std::process::exit(1);
             }
             remove_app(&args[2])?;
+        }
+        "open" => {
+            if args.len() < 3 {
+                eprintln!("Usage: tack open <name>");
+                std::process::exit(1);
+            }
+            open_app(&args[2])?;
         }
         "update" => {
             if args.len() < 3 {
