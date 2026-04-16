@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::error::Error;
-use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -395,16 +394,8 @@ fn install_app(url: &str, name: &str) -> Result<(), Box<dyn Error>> {
 
     let desktop_file_path = get_desktop_file_path(&slug, &share_dir);
     if desktop_file_path.exists() {
-        print!("{} is already installed. Overwrite? [y/N] ", name);
-        Write::flush(&mut io::stdout()).ok();
-
-        let mut buffer = String::new();
-        let _ = io::stdin().read_line(&mut buffer);
-
-        let input = buffer.trim();
-        if input != "y" && input != "Y" {
-            std::process::exit(0);
-        }
+        eprintln!("{} is already installed. Use `tack update {}` to modify it.", name, name);
+        std::process::exit(1);
     }
 
     println!("Installing {} from {}", name, url);
