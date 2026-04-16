@@ -418,14 +418,14 @@ fn open_app(name: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn install_app(url: &str, name: &str) -> Result<(), Box<dyn Error>> {
+fn install_app(url: &str, name: &str, force: bool) -> Result<(), Box<dyn Error>> {
     let url = normalize_url(url);
 
     let share_dir = get_share_dir()?;
     let slug = slugify(name);
 
     let desktop_file_path = get_desktop_file_path(&slug, &share_dir);
-    if desktop_file_path.exists() {
+    if desktop_file_path.exists() && !force {
         eprintln!("{} is already installed. Use `tack update {}` to modify it.", name, name);
         std::process::exit(1);
     }
@@ -472,7 +472,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().collect();
 
     if args.len() < 2 {
-        eprintln!("Usage: tack <url> <name>");
+        eprintln!("Usage: tack <url> <name> [--force]");
         eprintln!("       tack list");
         eprintln!("       tack open <name>");
         eprintln!("       tack remove <name>");
@@ -508,11 +508,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             update_app(&args[2], flags)?;
         }
         _ => {
-            if args.len() < 3 {
-                eprintln!("Usage: tack <url> <name>");
+            let force = args.contains(&"--force".to_string());
+            let positional: Vec<&String> = args[1..].iter().filter(|a| *a != "--force").collect();
+
+            if positional.len() < 2 {
+                eprintln!("Usage: tack <url> <name> [--force]");
                 std::process::exit(1);
             }
-            install_app(&args[1], &args[2])?;
+            install_app(positional[0], positional[1], force)?;
         }
     }
 
