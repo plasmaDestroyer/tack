@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::error::Error;
+use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -399,9 +400,20 @@ fn open_app(name: &str) -> Result<(), Box<dyn Error>> {
 
     println!("Opening {} ({})", entry.name, entry.url);
 
-    std::process::Command::new(&entry.browser)
-        .arg(format!("--app={}", entry.url))
-        .spawn()?;
+    use std::process::Stdio;
+
+    unsafe {
+        std::process::Command::new(&entry.browser)
+            .arg(format!("--app={}", entry.url))
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .pre_exec(|| {
+                libc::setsid();
+                Ok(())
+            })
+            .spawn()?;
+    }
 
     Ok(())
 }
