@@ -4,12 +4,12 @@
 
 ## How it works
 
-`tack` takes a website URL and a name, and automatically sets up a desktop application for it. It fetches the website's favicon (supporting `.png` and `.svg` formats), saves it to your system icons directory, and generates a `.desktop` file that launches the website using Chromium in a standalone app window. All installed applications are tracked in a metadata manifest.
+`tack` takes a website URL and a name, and automatically sets up a desktop application for it. It features a robust icon fetching pipeline: it first checks your local icon cache, then tries to fetch high-quality SVG logos from `svgl.app`, scrapes the website's HTML for `<link>` tags (like `apple-touch-icon`), and finally falls back to `/favicon.ico` or the Google Favicons API. It supports `.png`, `.svg`, and even legacy `.ico` formats (which it natively converts to `.png`). It then generates a `.desktop` file that launches the website using Chromium in a standalone app window. All installed applications are tracked in a metadata manifest.
 
 ## Usage
 
 ```bash
-tack <url> <name> [--force]
+tack <url> <name> [--force] [--icon PATH]
 tack list
 tack open <name>
 tack update <name> [--name NAME] [--url URL] [--browser BROWSER] [--icon PATH]
@@ -25,6 +25,12 @@ tack https://youtube.com YouTube
 ```
 
 This will create a "YouTube" application in your app launcher. `tack` will normalize URLs (adding `https://` if missing) and sanitize app names. If an app with the same name is already installed, it will exit unless you provide the `--force` flag to overwrite it.
+
+You can also bypass the automatic icon fetching by providing a custom icon path:
+
+```bash
+tack https://youtube.com YouTube --icon /path/to/my-icon.png
+```
 
 ### List Installed Apps
 
