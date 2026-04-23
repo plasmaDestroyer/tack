@@ -43,18 +43,30 @@ pub fn install_app(
             return Err(format!("Icon file not found: {}", icon_path_str).into());
         }
     } else {
-        println!("Fetching favicon for {}...", url);
-        if let Some(bytes) = fetch_favicon(&url) {
-            if let Some(icon_format) = detect_format(&bytes) {
-                println!("Favicon fetched successfully!");
-                save_icon(&slug, &bytes, icon_format, &share_dir)?
+        let icons_dir = share_dir.join("icons");
+        let cached_png = icons_dir.join(format!("{}.png", slug));
+        let cached_svg = icons_dir.join(format!("{}.svg", slug));
+
+        if cached_png.exists() {
+            println!("Found cached icon: {}", cached_png.display());
+            cached_png
+        } else if cached_svg.exists() {
+            println!("Found cached icon: {}", cached_svg.display());
+            cached_svg
+        } else {
+            println!("Fetching favicon for {}...", url);
+            if let Some(bytes) = fetch_favicon(&url) {
+                if let Some(icon_format) = detect_format(&bytes) {
+                    println!("Favicon fetched successfully!");
+                    save_icon(&slug, &bytes, icon_format, &share_dir)?
+                } else {
+                    println!("Wrong image format ... Installing with Default icon.");
+                    save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir)?
+                }
             } else {
-                println!("Wrong image format ... Installing with Default icon.");
+                println!("Favicon not found ... Installing with Default icon.");
                 save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir)?
             }
-        } else {
-            println!("Favicon not found ... Installing with Default icon.");
-            save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir)?
         }
     };
 
