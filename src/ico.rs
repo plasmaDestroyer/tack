@@ -7,7 +7,6 @@
 ///      top-down DIB header; we flip rows, swizzle to RGBA, and encode a
 ///      minimal valid PNG (IHDR + IDAT + IEND) using store-only deflate
 ///      (no compression crate needed).
-
 use std::error::Error;
 
 // ── ICO directory structures ────────────────────────────────────────────
@@ -215,11 +214,7 @@ fn encode_png(width: u32, height: u32, rgba: &[u8]) -> Vec<u8> {
 /// ICO BMP entries store a BITMAPINFOHEADER (40 bytes) followed by pixel
 /// data.  The height field is doubled (image + AND mask).  Pixel rows are
 /// stored bottom-to-top.  Colour channels are BGRA.
-fn decode_bmp_entry(
-    data: &[u8],
-    width: u32,
-    height: u32,
-) -> Result<Vec<u8>, Box<dyn Error>> {
+fn decode_bmp_entry(data: &[u8], width: u32, height: u32) -> Result<Vec<u8>, Box<dyn Error>> {
     if data.len() < 40 {
         return Err("BMP entry too short for DIB header".into());
     }
@@ -248,9 +243,9 @@ fn decode_bmp_entry(
                 for x in 0..width as usize {
                     let si = src_row + x * 4;
                     let di = dst_row + x * 4;
-                    rgba[di] = data[si + 2];     // R ← B
+                    rgba[di] = data[si + 2]; // R ← B
                     rgba[di + 1] = data[si + 1]; // G
-                    rgba[di + 2] = data[si];     // B ← R
+                    rgba[di + 2] = data[si]; // B ← R
                     rgba[di + 3] = data[si + 3]; // A
                 }
             }
@@ -266,8 +261,7 @@ fn decode_bmp_entry(
                 return Err("BMP 24bpp pixel data truncated".into());
             }
 
-            let has_and_mask =
-                data.len() >= and_mask_offset + and_row_bytes * height as usize;
+            let has_and_mask = data.len() >= and_mask_offset + and_row_bytes * height as usize;
 
             let mut rgba = vec![0u8; pixel_count];
             for y in 0..height as usize {
@@ -276,14 +270,13 @@ fn decode_bmp_entry(
                 for x in 0..width as usize {
                     let si = src_row + x * 3;
                     let di = dst_row + x * 4;
-                    rgba[di] = data[si + 2];     // R
+                    rgba[di] = data[si + 2]; // R
                     rgba[di + 1] = data[si + 1]; // G
-                    rgba[di + 2] = data[si];     // B
+                    rgba[di + 2] = data[si]; // B
 
                     // Alpha from AND mask (1 = transparent, 0 = opaque)
                     if has_and_mask {
-                        let and_row =
-                            and_mask_offset + (height as usize - 1 - y) * and_row_bytes;
+                        let and_row = and_mask_offset + (height as usize - 1 - y) * and_row_bytes;
                         let byte_idx = and_row + x / 8;
                         let bit_idx = 7 - (x % 8);
                         let transparent = (data[byte_idx] >> bit_idx) & 1;
@@ -303,11 +296,7 @@ fn decode_bmp_entry(
 
 /// Returns `true` if `data` looks like an ICO file (reserved=0, type=1).
 pub fn is_ico(data: &[u8]) -> bool {
-    data.len() >= 6
-        && data[0] == 0
-        && data[1] == 0
-        && data[2] == 1
-        && data[3] == 0
+    data.len() >= 6 && data[0] == 0 && data[1] == 0 && data[2] == 1 && data[3] == 0
 }
 
 /// Convert an ICO file to PNG bytes.
