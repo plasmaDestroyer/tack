@@ -1,11 +1,14 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
+use crate::ico;
+
 pub const DEFAULT_ICON: &[u8] = include_bytes!("../assets/default.png");
 
 pub enum ImageFormat {
     Png,
     Svg,
+    Ico,
 }
 
 pub fn fetch_favicon(url: &str) -> Option<Vec<u8>> {
@@ -29,13 +32,18 @@ pub fn save_icon(
     let icons_dir = share_dir.join("icons");
     std::fs::create_dir_all(&icons_dir)?;
 
-    let extension = match format {
-        ImageFormat::Png => "png",
-        ImageFormat::Svg => "svg",
+    // If the source is ICO, convert to PNG first.
+    let (final_bytes, extension) = match format {
+        ImageFormat::Ico => {
+            let png_bytes = ico::ico_to_png(bytes)?;
+            (png_bytes, "png")
+        }
+        ImageFormat::Png => (bytes.to_vec(), "png"),
+        ImageFormat::Svg => (bytes.to_vec(), "svg"),
     };
 
     let icon_path = icons_dir.join(format!("{}.{}", slug, extension));
-    std::fs::write(&icon_path, bytes)?;
+    std::fs::write(&icon_path, &final_bytes)?;
     Ok(icon_path)
 }
 
@@ -44,6 +52,8 @@ pub fn detect_format(bytes: &[u8]) -> Option<ImageFormat> {
         Some(ImageFormat::Png)
     } else if bytes.starts_with(b"<svg") || bytes.starts_with(b"<?xml") {
         Some(ImageFormat::Svg)
+    } else if ico::is_ico(bytes) {
+        Some(ImageFormat::Ico)
     } else {
         None
     }

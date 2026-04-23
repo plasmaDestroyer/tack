@@ -1,5 +1,6 @@
 mod commands;
 mod desktop;
+mod ico;
 mod icon;
 mod manifest;
 mod util;
