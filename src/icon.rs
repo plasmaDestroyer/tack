@@ -14,13 +14,43 @@ pub enum ImageFormat {
 pub fn fetch_favicon(url: &str) -> Option<Vec<u8>> {
     let favicon_url = format!("{}/favicon.ico", url.trim_end_matches('/'));
 
-    let response = reqwest::blocking::get(&favicon_url).ok()?;
+    let direct_bytes = reqwest::blocking::get(&favicon_url)
+        .ok()
+        .and_then(|r| {
+            if r.status().is_success() {
+                r.bytes().ok()
+            } else {
+                None
+            }
+        })
+        .map(|b| b.to_vec());
 
-    if response.status().is_success() {
-        response.bytes().ok().map(|b| b.to_vec())
-    } else {
-        None
+    if direct_bytes.is_some() {
+        return direct_bytes;
     }
+
+    if let Ok(parsed_url) = reqwest::Url::parse(url) {
+        if let Some(host) = parsed_url.host_str() {
+            let google_api_url =
+                format!("https://www.google.com/s2/favicons?domain={}&sz=128", host);
+            let google_bytes = reqwest::blocking::get(&google_api_url)
+                .ok()
+                .and_then(|r| {
+                    if r.status().is_success() {
+                        r.bytes().ok()
+                    } else {
+                        None
+                    }
+                })
+                .map(|b| b.to_vec());
+
+            if google_bytes.is_some() {
+                return google_bytes;
+            }
+        }
+    }
+
+    None
 }
 
 pub fn save_icon(
