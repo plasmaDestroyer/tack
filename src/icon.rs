@@ -68,26 +68,71 @@ fn find_icon_in_html(html: &str) -> Option<String> {
     best_href
 }
 
+pub fn fetch_svgl_icon(url: &str) -> Option<Vec<u8>> {
+    let parsed_target = reqwest::Url::parse(url).ok()?;
+    let target_host = parsed_target.host_str()?.replace("www.", "");
+
+    let response = reqwest::blocking::get("https://api.svgl.app").ok()?;
+    if !response.status().is_success() {
+        return None;
+    }
+
+    let text = response.text().ok()?;
+    let json: serde_json::Value = serde_json::from_str(&text).ok()?;
+    let entries = json.as_array()?;
+
+    for entry in entries {
+        if let Some(entry_url_str) = entry.get("url").and_then(|u| u.as_str())
+            && let Ok(parsed_entry) = reqwest::Url::parse(entry_url_str)
+            && let Some(entry_host) = parsed_entry.host_str()
+        {
+            let entry_host_clean = entry_host.replace("www.", "");
+            if entry_host_clean == target_host {
+                let route = entry.get("route");
+                let svg_url = if let Some(r) = route.and_then(|r| r.as_str()) {
+                    Some(r)
+                } else if let Some(obj) = route.and_then(|r| r.as_object()) {
+                    obj.get("light")
+                        .or_else(|| obj.get("dark"))
+                        .and_then(|v| v.as_str())
+                } else {
+                    None
+                };
+
+                if let Some(dl_url) = svg_url
+                    && let Ok(r) = reqwest::blocking::get(dl_url)
+                    && r.status().is_success()
+                    && let Ok(bytes) = r.bytes()
+                {
+                    return Some(bytes.to_vec());
+                }
+            }
+        }
+    }
+    None
+}
+
 pub fn fetch_favicon(url: &str) -> Option<Vec<u8>> {
+    // 0. Try fetching from svgl.app first
+    if let Some(svgl_bytes) = fetch_svgl_icon(url) {
+        return Some(svgl_bytes);
+    }
+
     let parsed_url = reqwest::Url::parse(url).ok()?;
 
     // 1. Try fetching the HTML to find icon tags
-    if let Ok(response) = reqwest::blocking::get(url) {
-        if response.status().is_success() {
-            if let Ok(html) = response.text() {
-                if let Some(href) = find_icon_in_html(&html) {
-                    if let Ok(icon_url) = parsed_url.join(&href) {
-                        let icon_response = reqwest::blocking::get(icon_url).ok();
-                        if let Some(r) = icon_response {
-                            if r.status().is_success() {
-                                if let Ok(bytes) = r.bytes() {
-                                    return Some(bytes.to_vec());
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+    if let Ok(response) = reqwest::blocking::get(url)
+        && response.status().is_success()
+        && let Ok(html) = response.text()
+        && let Some(href) = find_icon_in_html(&html)
+        && let Ok(icon_url) = parsed_url.join(&href)
+    {
+        let icon_response = reqwest::blocking::get(icon_url).ok();
+        if let Some(r) = icon_response
+            && r.status().is_success()
+            && let Ok(bytes) = r.bytes()
+        {
+            return Some(bytes.to_vec());
         }
     }
 

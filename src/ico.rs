@@ -127,7 +127,7 @@ fn zlib_store(data: &[u8]) -> Vec<u8> {
     let num_blocks = if data.is_empty() {
         1
     } else {
-        (data.len() + max_block - 1) / max_block
+        data.len().div_ceil(max_block)
     };
     // 2 (header) + sum of block overhead (5 each) + data + 4 (adler32)
     let mut out = Vec::with_capacity(2 + num_blocks * 5 + data.len() + 4);
@@ -253,9 +253,9 @@ fn decode_bmp_entry(data: &[u8], width: u32, height: u32) -> Result<Vec<u8>, Box
         }
         24 => {
             // BGR, bottom-to-top, rows padded to 4-byte boundary
-            let row_bytes = ((24 * width as usize + 31) / 32) * 4;
+            let row_bytes = (24 * width as usize).div_ceil(32) * 4;
             let and_mask_offset = pixel_offset + row_bytes * height as usize;
-            let and_row_bytes = ((width as usize + 31) / 32) * 4;
+            let and_row_bytes = (width as usize).div_ceil(32) * 4;
 
             if data.len() < pixel_offset + row_bytes * height as usize {
                 return Err("BMP 24bpp pixel data truncated".into());
