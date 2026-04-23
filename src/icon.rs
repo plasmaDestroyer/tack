@@ -11,42 +11,120 @@ pub enum ImageFormat {
     Ico,
 }
 
-pub fn fetch_favicon(url: &str) -> Option<Vec<u8>> {
-    let favicon_url = format!("{}/favicon.ico", url.trim_end_matches('/'));
+fn get_href(original_tag: &str) -> Option<String> {
+    let tag_lower = original_tag.to_ascii_lowercase();
+    if let Some(href_idx) = tag_lower.find("href=\"") {
+        let start = href_idx + 6;
+        if let Some(end) = tag_lower[start..].find('"') {
+            return Some(original_tag[start..start + end].to_string());
+        }
+    }
+    if let Some(href_idx) = tag_lower.find("href='") {
+        let start = href_idx + 6;
+        if let Some(end) = tag_lower[start..].find('\'') {
+            return Some(original_tag[start..start + end].to_string());
+        }
+    }
+    None
+}
 
-    let direct_bytes = reqwest::blocking::get(&favicon_url)
-        .ok()
-        .and_then(|r| {
-            if r.status().is_success() {
-                r.bytes().ok()
-            } else {
-                None
+fn find_icon_in_html(html: &str) -> Option<String> {
+    let html_lower = html.to_ascii_lowercase();
+    let mut best_href = None;
+    let mut best_score = 0;
+
+    let mut search_start = 0;
+    while let Some(idx) = html_lower[search_start..].find("<link ") {
+        let tag_start = search_start + idx;
+        let tag_end_idx = html_lower[tag_start..].find('>');
+        if let Some(end_offset) = tag_end_idx {
+            let tag_lower = &html_lower[tag_start..tag_start + end_offset + 1];
+
+            let mut score = 0;
+            if tag_lower.contains("rel=\"apple-touch-icon\"")
+                || tag_lower.contains("rel='apple-touch-icon'")
+            {
+                score = 3;
+            } else if tag_lower.contains("rel=\"icon\"") || tag_lower.contains("rel='icon'") {
+                score = 2;
+            } else if tag_lower.contains("rel=\"shortcut icon\"")
+                || tag_lower.contains("rel='shortcut icon'")
+            {
+                score = 1;
             }
-        })
-        .map(|b| b.to_vec());
 
-    if direct_bytes.is_some() {
-        return direct_bytes;
+            if score > best_score {
+                let original_tag = &html[tag_start..tag_start + end_offset + 1];
+                if let Some(href) = get_href(original_tag) {
+                    best_score = score;
+                    best_href = Some(href);
+                }
+            }
+            search_start = tag_start + end_offset;
+        } else {
+            break;
+        }
+    }
+    best_href
+}
+
+pub fn fetch_favicon(url: &str) -> Option<Vec<u8>> {
+    let parsed_url = reqwest::Url::parse(url).ok()?;
+
+    // 1. Try fetching the HTML to find icon tags
+    if let Ok(response) = reqwest::blocking::get(url) {
+        if response.status().is_success() {
+            if let Ok(html) = response.text() {
+                if let Some(href) = find_icon_in_html(&html) {
+                    if let Ok(icon_url) = parsed_url.join(&href) {
+                        let icon_response = reqwest::blocking::get(icon_url).ok();
+                        if let Some(r) = icon_response {
+                            if r.status().is_success() {
+                                if let Ok(bytes) = r.bytes() {
+                                    return Some(bytes.to_vec());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    if let Ok(parsed_url) = reqwest::Url::parse(url) {
-        if let Some(host) = parsed_url.host_str() {
-            let google_api_url =
-                format!("https://www.google.com/s2/favicons?domain={}&sz=128", host);
-            let google_bytes = reqwest::blocking::get(&google_api_url)
-                .ok()
-                .and_then(|r| {
-                    if r.status().is_success() {
-                        r.bytes().ok()
-                    } else {
-                        None
-                    }
-                })
-                .map(|b| b.to_vec());
+    // 2. Fallback to /favicon.ico directly
+    if let Ok(favicon_url) = parsed_url.join("/favicon.ico") {
+        let direct_bytes = reqwest::blocking::get(favicon_url.clone())
+            .ok()
+            .and_then(|r| {
+                if r.status().is_success() {
+                    r.bytes().ok()
+                } else {
+                    None
+                }
+            })
+            .map(|b| b.to_vec());
 
-            if google_bytes.is_some() {
-                return google_bytes;
-            }
+        if direct_bytes.is_some() {
+            return direct_bytes;
+        }
+    }
+
+    // 3. Fallback to Google Favicon API
+    if let Some(host) = parsed_url.host_str() {
+        let google_api_url = format!("https://www.google.com/s2/favicons?domain={}&sz=128", host);
+        let google_bytes = reqwest::blocking::get(&google_api_url)
+            .ok()
+            .and_then(|r| {
+                if r.status().is_success() {
+                    r.bytes().ok()
+                } else {
+                    None
+                }
+            })
+            .map(|b| b.to_vec());
+
+        if google_bytes.is_some() {
+            return google_bytes;
         }
     }
 
