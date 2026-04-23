@@ -6,7 +6,12 @@ use crate::icon::{DEFAULT_ICON, ImageFormat, detect_format, fetch_favicon, save_
 use crate::manifest::{AppEntry, add_or_update_app, get_manifest_path};
 use crate::util::{get_share_dir, normalize_url, slugify};
 
-pub fn install_app(url: &str, name: &str, force: bool) -> Result<(), Box<dyn Error>> {
+pub fn install_app(
+    url: &str,
+    name: &str,
+    force: bool,
+    icon_arg: Option<String>,
+) -> Result<(), Box<dyn Error>> {
     let url = normalize_url(url);
 
     let share_dir = get_share_dir()?;
@@ -23,19 +28,35 @@ pub fn install_app(url: &str, name: &str, force: bool) -> Result<(), Box<dyn Err
 
     println!("Installing {} from {}", name, url);
 
-    println!("Fetching favicon for {}...", url);
-    let icon_path = if let Some(bytes) = fetch_favicon(&url) {
-        if let Some(icon_format) = detect_format(&bytes) {
-            println!("Favicon fetched successfully!");
-            save_icon(&slug, &bytes, icon_format, &share_dir)
+    let mut user_supplied_icon = false;
+
+    let icon_path = if let Some(icon_path_str) = icon_arg {
+        let icon_path_buf = std::path::PathBuf::from(&icon_path_str);
+        if icon_path_buf.exists() {
+            println!("Using custom icon: {}", icon_path_str);
+            let bytes = std::fs::read(&icon_path_buf)?;
+            let format = detect_format(&bytes)
+                .ok_or("Unsupported icon format (expected PNG, SVG, or ICO)")?;
+            user_supplied_icon = true;
+            save_icon(&slug, &bytes, format, &share_dir)?
         } else {
-            println!("Wrong image format ... Installing with Default icon.");
-            save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir)
+            return Err(format!("Icon file not found: {}", icon_path_str).into());
         }
     } else {
-        println!("Favicon not found ... Installing with Default icon.");
-        save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir)
-    }?;
+        println!("Fetching favicon for {}...", url);
+        if let Some(bytes) = fetch_favicon(&url) {
+            if let Some(icon_format) = detect_format(&bytes) {
+                println!("Favicon fetched successfully!");
+                save_icon(&slug, &bytes, icon_format, &share_dir)?
+            } else {
+                println!("Wrong image format ... Installing with Default icon.");
+                save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir)?
+            }
+        } else {
+            println!("Favicon not found ... Installing with Default icon.");
+            save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir)?
+        }
+    };
 
     println!("Icon saved at: {}", icon_path.display());
 
@@ -50,6 +71,7 @@ pub fn install_app(url: &str, name: &str, force: bool) -> Result<(), Box<dyn Err
         browser: String::from("chromium"),
         icon_path: icon_path.display().to_string(),
         installed_at: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+        user_supplied_icon,
     };
     add_or_update_app(&manifest_path, entry)?;
     println!("Manifest updated at: {}", manifest_path.display());

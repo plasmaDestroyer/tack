@@ -80,31 +80,36 @@ pub fn update_app(current_name: &str, flags: UpdateFlags) -> Result<(), Box<dyn 
         if icon_path_buf.exists() {
             // User supplied a local file
             let bytes = std::fs::read(&icon_path_buf)?;
-            let format =
-                detect_format(&bytes).ok_or("Unsupported icon format (expected PNG or SVG)")?;
+            let format = detect_format(&bytes)
+                .ok_or("Unsupported icon format (expected PNG, SVG, or ICO)")?;
             let saved = save_icon(&slug, &bytes, format, &share_dir)?;
             println!("Icon saved at: {}", saved.display());
             entry.icon_path = saved.display().to_string();
+            entry.user_supplied_icon = true;
         } else {
             return Err(format!("Icon file not found: {}", icon_arg).into());
         }
     } else if !has_overrides {
-        // Repair mode: re-fetch favicon from the app's URL
-        println!("Repair mode: re-fetching favicon for {}...", entry.url);
-        let icon_path = if let Some(bytes) = fetch_favicon(&entry.url) {
-            if let Some(icon_format) = detect_format(&bytes) {
-                println!("Favicon fetched successfully!");
-                save_icon(&slug, &bytes, icon_format, &share_dir)
-            } else {
-                println!("Wrong image format ... restoring default icon.");
-                save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir)
-            }
+        if entry.user_supplied_icon {
+            println!("Repair mode: skipping favicon re-fetch because it is user-supplied.");
         } else {
-            println!("Favicon not found ... restoring default icon.");
-            save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir)
-        }?;
-        println!("Icon saved at: {}", icon_path.display());
-        entry.icon_path = icon_path.display().to_string();
+            // Repair mode: re-fetch favicon from the app's URL
+            println!("Repair mode: re-fetching favicon for {}...", entry.url);
+            let icon_path = if let Some(bytes) = fetch_favicon(&entry.url) {
+                if let Some(icon_format) = detect_format(&bytes) {
+                    println!("Favicon fetched successfully!");
+                    save_icon(&slug, &bytes, icon_format, &share_dir)
+                } else {
+                    println!("Wrong image format ... restoring default icon.");
+                    save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir)
+                }
+            } else {
+                println!("Favicon not found ... restoring default icon.");
+                save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir)
+            }?;
+            println!("Icon saved at: {}", icon_path.display());
+            entry.icon_path = icon_path.display().to_string();
+        }
     }
 
     // Rewrite .desktop file

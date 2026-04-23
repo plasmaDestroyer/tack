@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().collect();
 
     if args.len() < 2 {
-        eprintln!("Usage: tack <url> <name> [--force]");
+        eprintln!("Usage: tack <url> <name> [--force] [--icon PATH]");
         eprintln!("       tack list");
         eprintln!("       tack open <name>");
         eprintln!("       tack remove <name>");
@@ -59,13 +59,32 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         _ => {
             let force = args.contains(&"--force".to_string());
-            let positional: Vec<&String> = args[1..].iter().filter(|a| *a != "--force").collect();
+            let mut icon_path = None;
+            let mut positional = Vec::new();
+
+            let mut i = 1;
+            while i < args.len() {
+                if args[i] == "--force" {
+                    // skip
+                } else if args[i] == "--icon" {
+                    if i + 1 < args.len() {
+                        icon_path = Some(args[i + 1].clone());
+                        i += 1; // skip next
+                    } else {
+                        eprintln!("--icon requires a value");
+                        std::process::exit(1);
+                    }
+                } else {
+                    positional.push(&args[i]);
+                }
+                i += 1;
+            }
 
             if positional.len() < 2 {
-                eprintln!("Usage: tack <url> <name> [--force]");
+                eprintln!("Usage: tack <url> <name> [--force] [--icon PATH]");
                 std::process::exit(1);
             }
-            install_app(positional[0], positional[1], force)?;
+            install_app(positional[0], positional[1], force, icon_path)?;
         }
     }
 

@@ -10,6 +10,8 @@ pub struct AppEntry {
     pub browser: String,
     pub icon_path: String,
     pub installed_at: u64,
+    #[serde(default)]
+    pub user_supplied_icon: bool,
 }
 
 pub fn get_manifest_path(share_dir: &Path) -> PathBuf {
