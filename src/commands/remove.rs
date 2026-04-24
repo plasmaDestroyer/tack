@@ -3,6 +3,7 @@ use std::path::Path;
 
 use crate::desktop::get_desktop_file_path;
 use crate::manifest::{get_manifest_path, load_manifest, save_manifest};
+use crate::output;
 use crate::util::{get_share_dir, slugify};
 
 pub fn remove_app(name: &str) -> Result<(), Box<dyn Error>> {
@@ -16,7 +17,7 @@ pub fn remove_app(name: &str) -> Result<(), Box<dyn Error>> {
     let entry = match position {
         Some(i) => entries.remove(i),
         None => {
-            eprintln!("App '{}' is not installed.", name);
+            output::error(&format!("App '{}' is not installed.", name));
             std::process::exit(1);
         }
     };
@@ -25,7 +26,10 @@ pub fn remove_app(name: &str) -> Result<(), Box<dyn Error>> {
     let desktop_file_path = get_desktop_file_path(&slug, &share_dir);
     if desktop_file_path.exists() {
         std::fs::remove_file(&desktop_file_path)?;
-        println!("Removed desktop file: {}", desktop_file_path.display());
+        output::info(&format!(
+            "Removed desktop file: {}",
+            desktop_file_path.display()
+        ));
     }
 
     // Delete icon only if it lives inside share_dir/icons/ (i.e. managed by tack)
@@ -34,16 +38,16 @@ pub fn remove_app(name: &str) -> Result<(), Box<dyn Error>> {
     if icon_path.exists() {
         if icon_path.starts_with(&icons_dir) {
             std::fs::remove_file(icon_path)?;
-            println!("Removed icon: {}", entry.icon_path);
+            output::info(&format!("Removed icon: {}", entry.icon_path));
         } else {
-            println!("Skipping user-supplied icon: {}", entry.icon_path);
+            output::info(&format!("Skipping user-supplied icon: {}", entry.icon_path));
         }
     }
 
-    // Save updated manifest
-    save_manifest(&manifest_path, &entries)?;
-    println!("Manifest updated.");
+    // Save updated manifest (never dry-run for remove)
+    save_manifest(&manifest_path, &entries, false)?;
+    output::info("Manifest updated.");
 
-    println!("✓ {} removed successfully!", name);
+    output::success(&format!("✓ {} removed successfully!", name));
     Ok(())
 }

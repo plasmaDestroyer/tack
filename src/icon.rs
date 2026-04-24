@@ -2,6 +2,7 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use crate::ico;
+use crate::output;
 
 pub const DEFAULT_ICON: &[u8] = include_bytes!("../assets/default.png");
 
@@ -181,9 +182,9 @@ pub fn save_icon(
     bytes: &[u8],
     format: ImageFormat,
     share_dir: &Path,
+    dry_run: bool,
 ) -> Result<PathBuf, Box<dyn Error>> {
     let icons_dir = share_dir.join("icons");
-    std::fs::create_dir_all(&icons_dir)?;
 
     // If the source is ICO, convert to PNG first.
     let (final_bytes, extension) = match format {
@@ -196,6 +197,13 @@ pub fn save_icon(
     };
 
     let icon_path = icons_dir.join(format!("{}.{}", slug, extension));
+
+    if dry_run {
+        output::dry_run(&format!("would save icon: {}", icon_path.display()));
+        return Ok(icon_path);
+    }
+
+    std::fs::create_dir_all(&icons_dir)?;
     std::fs::write(&icon_path, &final_bytes)?;
     Ok(icon_path)
 }

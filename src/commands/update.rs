@@ -4,7 +4,8 @@ use std::path::PathBuf;
 use crate::desktop::{create_desktop_file, get_desktop_file_path};
 use crate::icon::{DEFAULT_ICON, ImageFormat, detect_format, fetch_favicon, save_icon};
 use crate::manifest::{get_manifest_path, load_manifest, save_manifest};
-use crate::util::{get_share_dir, normalize_url, slugify};
+use crate::output;
+use crate::util::{check_online, get_share_dir, normalize_url, slugify, validate_url};
 
 #[derive(Default)]
 pub struct UpdateFlags {
@@ -47,7 +48,11 @@ pub fn parse_update_flags(args: &[String]) -> Result<UpdateFlags, Box<dyn Error>
     Ok(flags)
 }
 
-pub fn update_app(current_name: &str, flags: UpdateFlags) -> Result<(), Box<dyn Error>> {
+pub fn update_app(
+    current_name: &str,
+    flags: UpdateFlags,
+    dry_run: bool,
+) -> Result<(), Box<dyn Error>> {
     let share_dir = get_share_dir()?;
     let slug = slugify(current_name);
     let manifest_path = get_manifest_path(&share_dir);
@@ -65,7 +70,13 @@ pub fn update_app(current_name: &str, flags: UpdateFlags) -> Result<(), Box<dyn 
 
     // Apply field overrides
     if let Some(new_url) = &flags.url {
-        entry.url = normalize_url(new_url);
+        let normalized = normalize_url(new_url);
+        // Validate new URL (#23)
+        if let Err(msg) = validate_url(&normalized) {
+            output::error(&msg);
+            std::process::exit(1);
+        }
+        entry.url = normalized;
     }
     if let Some(new_browser) = &flags.browser {
         entry.browser = new_browser.clone();
@@ -82,32 +93,43 @@ pub fn update_app(current_name: &str, flags: UpdateFlags) -> Result<(), Box<dyn 
             let bytes = std::fs::read(&icon_path_buf)?;
             let format = detect_format(&bytes)
                 .ok_or("Unsupported icon format (expected PNG, SVG, or ICO)")?;
-            let saved = save_icon(&slug, &bytes, format, &share_dir)?;
-            println!("Icon saved at: {}", saved.display());
+            let saved = save_icon(&slug, &bytes, format, &share_dir, dry_run)?;
+            output::info(&format!("Icon saved at: {}", saved.display()));
             entry.icon_path = saved.display().to_string();
             entry.user_supplied_icon = true;
         } else {
-            return Err(format!("Icon file not found: {}", icon_arg).into());
+            output::error(&format!("Icon file not found: {}", icon_arg));
+            std::process::exit(1);
         }
     } else if !has_overrides {
         if entry.user_supplied_icon {
-            println!("Repair mode: skipping favicon re-fetch because it is user-supplied.");
+            output::info("Repair mode: skipping favicon re-fetch because it is user-supplied.");
         } else {
             // Repair mode: re-fetch favicon from the app's URL
-            println!("Repair mode: re-fetching favicon for {}...", entry.url);
+            output::info(&format!(
+                "Repair mode: re-fetching favicon for {}...",
+                entry.url
+            ));
+
+            // Offline check (#24)
+            if !check_online() {
+                output::error("No network connection. Use --icon to update with a custom icon.");
+                std::process::exit(1);
+            }
+
             let icon_path = if let Some(bytes) = fetch_favicon(&entry.url) {
                 if let Some(icon_format) = detect_format(&bytes) {
-                    println!("Favicon fetched successfully!");
-                    save_icon(&slug, &bytes, icon_format, &share_dir)
+                    output::success("Favicon fetched successfully!");
+                    save_icon(&slug, &bytes, icon_format, &share_dir, dry_run)
                 } else {
-                    println!("Wrong image format ... restoring default icon.");
-                    save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir)
+                    output::warn("Wrong image format — restoring default icon.");
+                    save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir, dry_run)
                 }
             } else {
-                println!("Favicon not found ... restoring default icon.");
-                save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir)
+                output::warn("Favicon not found — restoring default icon.");
+                save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir, dry_run)
             }?;
-            println!("Icon saved at: {}", icon_path.display());
+            output::info(&format!("Icon saved at: {}", icon_path.display()));
             entry.icon_path = icon_path.display().to_string();
         }
     }
@@ -123,15 +145,19 @@ pub fn update_app(current_name: &str, flags: UpdateFlags) -> Result<(), Box<dyn 
         &entry.browser,
         config.categories.as_deref(),
         &desktop_file_path,
+        dry_run,
     )?;
-    println!("Desktop file updated at: {}", desktop_file_path.display());
+    output::info(&format!(
+        "Desktop file updated at: {}",
+        desktop_file_path.display()
+    ));
 
     let final_name = entry.name.clone();
 
     // Persist manifest
-    save_manifest(&manifest_path, &entries)?;
-    println!("Manifest updated at: {}", manifest_path.display());
+    save_manifest(&manifest_path, &entries, dry_run)?;
+    output::info(&format!("Manifest updated at: {}", manifest_path.display()));
 
-    println!("✓ {} updated successfully!", final_name);
+    output::success(&format!("✓ {} updated successfully!", final_name));
     Ok(())
 }

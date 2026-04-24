@@ -1,11 +1,12 @@
 use std::error::Error;
 
 use crate::config::{get_config_path, load_config};
+use crate::output;
 
 pub fn handle_config(args: &[String]) -> Result<(), Box<dyn Error>> {
     if args.is_empty() {
-        eprintln!("Usage: tack config show");
-        eprintln!("       tack config set <key> <value>");
+        output::error("Usage: tack config show");
+        output::error("       tack config set <key> <value>");
         std::process::exit(1);
     }
 
@@ -13,13 +14,13 @@ pub fn handle_config(args: &[String]) -> Result<(), Box<dyn Error>> {
         "show" => show_config(),
         "set" => {
             if args.len() < 3 {
-                eprintln!("Usage: tack config set <key> <value>");
+                output::error("Usage: tack config set <key> <value>");
                 std::process::exit(1);
             }
             set_config(&args[1], &args[2])
         }
         _ => {
-            eprintln!("Unknown config command: {}", args[0]);
+            output::error(&format!("Unknown config command: {}", args[0]));
             std::process::exit(1);
         }
     }
@@ -32,9 +33,9 @@ fn show_config() -> Result<(), Box<dyn Error>> {
         .unwrap_or_else(|| "detect from PATH (fallback to chromium)".to_string());
     let categories = config.categories.unwrap_or_else(|| "Network;".to_string());
 
-    println!("Current configuration:");
-    println!("  browser = \"{}\"", browser);
-    println!("  categories = \"{}\"", categories);
+    output::info("Current configuration:");
+    output::info(&format!("  browser = \"{}\"", browser));
+    output::info(&format!("  categories = \"{}\"", categories));
 
     Ok(())
 }
@@ -75,6 +76,6 @@ fn set_config(key: &str, value: &str) -> Result<(), Box<dyn Error>> {
     }
 
     std::fs::write(&config_path, lines.join("\n") + "\n")?;
-    println!("Config updated successfully.");
+    output::success("Config updated successfully.");
     Ok(())
 }

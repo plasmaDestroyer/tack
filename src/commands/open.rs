@@ -3,6 +3,7 @@ use std::os::unix::process::CommandExt;
 use std::process::Stdio;
 
 use crate::manifest::{get_manifest_path, load_manifest};
+use crate::output;
 use crate::util::{get_share_dir, slugify};
 
 pub fn open_app(name: &str) -> Result<(), Box<dyn Error>> {
@@ -16,7 +17,7 @@ pub fn open_app(name: &str) -> Result<(), Box<dyn Error>> {
         .find(|e| e.slug == slug)
         .ok_or_else(|| format!("App '{}' is not installed.", name))?;
 
-    println!("Opening {} ({})", entry.name, entry.url);
+    output::info(&format!("Opening {} ({})", entry.name, entry.url));
 
     unsafe {
         std::process::Command::new(&entry.browser)

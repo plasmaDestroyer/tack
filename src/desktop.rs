@@ -1,6 +1,8 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
+use crate::output;
+
 pub fn get_desktop_file_path(slug: &str, share_dir: &Path) -> PathBuf {
     share_dir
         .join("applications")
@@ -14,11 +16,11 @@ pub fn create_desktop_file(
     browser: &str,
     categories: Option<&str>,
     desktop_file_path: &Path,
+    dry_run: bool,
 ) -> Result<(), Box<dyn Error>> {
     let applications_dir = &desktop_file_path
         .parent()
         .ok_or("Invalid desktop file path")?;
-    std::fs::create_dir_all(applications_dir)?;
 
     let exec_args = if browser == "firefox"
         || browser == "zen-browser"
@@ -46,6 +48,13 @@ Categories={};",
         categories_str
     );
 
+    if dry_run {
+        output::dry_run(&format!("would create: {}", desktop_file_path.display()));
+        output::verbose(&format!("contents:\n{}", contents));
+        return Ok(());
+    }
+
+    std::fs::create_dir_all(applications_dir)?;
     std::fs::write(desktop_file_path, contents)?;
 
     Ok(())

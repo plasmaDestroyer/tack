@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
+use crate::output;
+
 #[derive(Serialize, Deserialize)]
 pub struct AppEntry {
     pub name: String,
@@ -27,7 +29,15 @@ pub fn load_manifest(path: &Path) -> Result<Vec<AppEntry>, Box<dyn Error>> {
     Ok(entries)
 }
 
-pub fn save_manifest(path: &Path, entries: &[AppEntry]) -> Result<(), Box<dyn Error>> {
+pub fn save_manifest(
+    path: &Path,
+    entries: &[AppEntry],
+    dry_run: bool,
+) -> Result<(), Box<dyn Error>> {
+    if dry_run {
+        output::dry_run(&format!("would update manifest: {}", path.display()));
+        return Ok(());
+    }
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
@@ -36,13 +46,17 @@ pub fn save_manifest(path: &Path, entries: &[AppEntry]) -> Result<(), Box<dyn Er
     Ok(())
 }
 
-pub fn add_or_update_app(manifest_path: &Path, entry: AppEntry) -> Result<(), Box<dyn Error>> {
+pub fn add_or_update_app(
+    manifest_path: &Path,
+    entry: AppEntry,
+    dry_run: bool,
+) -> Result<(), Box<dyn Error>> {
     let mut entries = load_manifest(manifest_path)?;
     if let Some(existing) = entries.iter_mut().find(|e| e.slug == entry.slug) {
         *existing = entry;
     } else {
         entries.push(entry);
     }
-    save_manifest(manifest_path, &entries)?;
+    save_manifest(manifest_path, &entries, dry_run)?;
     Ok(())
 }
