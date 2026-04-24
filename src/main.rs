@@ -8,6 +8,7 @@ mod util;
 
 use std::error::Error;
 
+use commands::config::handle_config;
 use commands::install::install_app;
 use commands::list::list_apps;
 use commands::open::open_app;
@@ -26,6 +27,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         eprintln!(
             "       tack update <name> [--name NAME] [--url URL] [--browser BROWSER] [--icon PATH]"
         );
+        eprintln!("       tack config show");
+        eprintln!("       tack config set <key> <value>");
         std::process::exit(1);
     }
 
@@ -57,6 +60,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             let flags = parse_update_flags(&args[3..])?;
             update_app(&args[2], flags)?;
+        }
+        "config" => {
+            handle_config(&args[2..])?;
         }
         _ => {
             let force = args.contains(&"--force".to_string());
