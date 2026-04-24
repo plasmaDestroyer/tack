@@ -11,6 +11,7 @@ pub fn install_app(
     name: &str,
     force: bool,
     icon_arg: Option<String>,
+    browser_arg: Option<String>,
 ) -> Result<(), Box<dyn Error>> {
     let url = normalize_url(url);
 
@@ -72,7 +73,9 @@ pub fn install_app(
 
     println!("Icon saved at: {}", icon_path.display());
 
-    create_desktop_file(name, &icon_path, &url, "chromium", &desktop_file_path)?;
+    let browser_name = browser_arg.unwrap_or_else(|| String::from("chromium"));
+
+    create_desktop_file(name, &icon_path, &url, &browser_name, &desktop_file_path)?;
     println!("Desktop file created at: {}", desktop_file_path.display());
 
     let manifest_path = get_manifest_path(&share_dir);
@@ -80,7 +83,7 @@ pub fn install_app(
         name: name.to_string(),
         slug,
         url,
-        browser: String::from("chromium"),
+        browser: browser_name,
         icon_path: icon_path.display().to_string(),
         installed_at: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
         user_supplied_icon,

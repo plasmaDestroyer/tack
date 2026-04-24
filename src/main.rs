@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().collect();
 
     if args.len() < 2 {
-        eprintln!("Usage: tack <url> <name> [--force] [--icon PATH]");
+        eprintln!("Usage: tack <url> <name> [--force] [--icon PATH] [--browser BROWSER]");
         eprintln!("       tack list");
         eprintln!("       tack open <name>");
         eprintln!("       tack remove <name>");
@@ -60,6 +60,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         _ => {
             let force = args.contains(&"--force".to_string());
             let mut icon_path = None;
+            let mut browser = None;
             let mut positional = Vec::new();
 
             let mut i = 1;
@@ -74,6 +75,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                         eprintln!("--icon requires a value");
                         std::process::exit(1);
                     }
+                } else if args[i] == "--browser" {
+                    if i + 1 < args.len() {
+                        browser = Some(args[i + 1].clone());
+                        i += 1; // skip next
+                    } else {
+                        eprintln!("--browser requires a value");
+                        std::process::exit(1);
+                    }
                 } else {
                     positional.push(&args[i]);
                 }
@@ -81,10 +90,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
 
             if positional.len() < 2 {
-                eprintln!("Usage: tack <url> <name> [--force] [--icon PATH]");
+                eprintln!("Usage: tack <url> <name> [--force] [--icon PATH] [--browser BROWSER]");
                 std::process::exit(1);
             }
-            install_app(positional[0], positional[1], force, icon_path)?;
+            install_app(positional[0], positional[1], force, icon_path, browser)?;
         }
     }
 
