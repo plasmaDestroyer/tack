@@ -73,11 +73,20 @@ pub fn install_app(
 
     println!("Icon saved at: {}", icon_path.display());
 
+    let config = crate::config::load_config();
     let browser_name = browser_arg
+        .or(config.browser)
         .or_else(detect_browser)
         .unwrap_or_else(|| String::from("chromium"));
 
-    create_desktop_file(name, &icon_path, &url, &browser_name, &desktop_file_path)?;
+    create_desktop_file(
+        name,
+        &icon_path,
+        &url,
+        &browser_name,
+        config.categories.as_deref(),
+        &desktop_file_path,
+    )?;
     println!("Desktop file created at: {}", desktop_file_path.display());
 
     let manifest_path = get_manifest_path(&share_dir);

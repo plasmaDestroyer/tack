@@ -12,6 +12,7 @@ pub fn create_desktop_file(
     icon_path: &Path,
     url: &str,
     browser: &str,
+    categories: Option<&str>,
     desktop_file_path: &Path,
 ) -> Result<(), Box<dyn Error>> {
     let applications_dir = &desktop_file_path
@@ -29,6 +30,8 @@ pub fn create_desktop_file(
         format!("{} --app={}", browser, url)
     };
 
+    let categories_str = categories.unwrap_or("Network");
+
     let contents = format!(
         "[Desktop Entry]
 Name={}
@@ -36,10 +39,11 @@ Exec={}
 Icon={}
 Type=Application
 Terminal=false
-Categories=Network;",
+Categories={};",
         name,
         exec_args,
-        icon_path.display()
+        icon_path.display(),
+        categories_str
     );
 
     std::fs::write(desktop_file_path, contents)?;

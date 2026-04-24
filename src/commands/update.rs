@@ -113,6 +113,7 @@ pub fn update_app(current_name: &str, flags: UpdateFlags) -> Result<(), Box<dyn 
     }
 
     // Rewrite .desktop file
+    let config = crate::config::load_config();
     let desktop_file_path = get_desktop_file_path(&slug, &share_dir);
     let icon_path = PathBuf::from(&entry.icon_path);
     create_desktop_file(
@@ -120,6 +121,7 @@ pub fn update_app(current_name: &str, flags: UpdateFlags) -> Result<(), Box<dyn 
         &icon_path,
         &entry.url,
         &entry.browser,
+        config.categories.as_deref(),
         &desktop_file_path,
     )?;
     println!("Desktop file updated at: {}", desktop_file_path.display());
