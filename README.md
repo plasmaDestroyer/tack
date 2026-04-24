@@ -11,10 +11,11 @@ It can auto-detect installed browsers by scanning your `PATH` and handles specif
 ## Usage
 
 ```bash
-tack <url> <name> [--force] [--icon PATH] [--browser BROWSER]
+tack <url> <name> [--force] [--icon PATH] [--browser BROWSER] [--dry-run] [--quiet] [--verbose]
+tack -i                           # interactive mode
 tack list
 tack open <name>
-tack update <name> [--name NAME] [--url URL] [--browser BROWSER] [--icon PATH]
+tack update <name> [--name NAME] [--url URL] [--browser BROWSER] [--icon PATH] [--dry-run]
 tack remove <name>
 tack config show
 tack config set <key> <value>
@@ -28,7 +29,7 @@ To install YouTube as a desktop app:
 tack https://youtube.com YouTube
 ```
 
-This will create a "YouTube" application in your app launcher. `tack` will normalize URLs (adding `https://` if missing) and sanitize app names. If an app with the same name is already installed, it will exit unless you provide the `--force` flag to overwrite it.
+This will create a "YouTube" application in your app launcher. `tack` will normalize URLs (adding `https://` if missing), validate them, and sanitize app names. If an app with the same name is already installed, it will exit unless you provide the `--force` flag to overwrite it.
 
 You can also bypass the automatic icon fetching by providing a custom icon path:
 
@@ -40,6 +41,33 @@ To specify a browser explicitly instead of relying on auto-detection:
 
 ```bash
 tack https://youtube.com YouTube --browser firefox
+```
+
+### Interactive Mode
+
+For a guided setup, use `-i` to be prompted step-by-step for the URL, name, browser, and icon:
+
+```bash
+tack -i
+```
+
+This will show detected browsers as a numbered list and let you choose an icon source (fetch from URL, custom path, or default).
+
+### Dry Run
+
+Preview what `tack` would do without writing anything to disk:
+
+```bash
+tack https://youtube.com YouTube --dry-run
+```
+
+### Output Control
+
+Control how much output `tack` produces:
+
+```bash
+tack https://youtube.com YouTube --quiet     # suppress stdout, errors still go to stderr
+tack https://youtube.com YouTube --verbose   # detailed logs (paths, HTTP status, format detection)
 ```
 
 ### List Installed Apps
@@ -92,6 +120,19 @@ To update a configuration value:
 tack config set browser brave-browser
 tack config set categories "Network;Entertainment;"
 ```
+
+## Features
+
+- **Auto icon fetching** — svgl.app → HTML `<link>` tags → `/favicon.ico` → Google Favicons API
+- **ICO to PNG conversion** — native, no external tools
+- **Browser auto-detection** — scans `PATH` for Chromium/Firefox-based browsers
+- **Colored output** — green/yellow/red ANSI colors, respects `NO_COLOR`
+- **URL validation** — catches malformed URLs before any work is done
+- **Offline detection** — fast TCP check before attempting network requests
+- **Interactive mode** (`-i`) — guided step-by-step setup
+- **Dry run** (`--dry-run`) — preview changes without touching the filesystem
+- **Quiet/Verbose** (`--quiet`, `--verbose`) — control output verbosity
+- **Persistent config** — `~/.config/tack/config.toml` for defaults
 
 ## Requirements
 
