@@ -4,7 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::desktop::{create_desktop_file, get_desktop_file_path};
 use crate::icon::{DEFAULT_ICON, ImageFormat, detect_format, fetch_favicon, save_icon};
 use crate::manifest::{AppEntry, add_or_update_app, get_manifest_path};
-use crate::util::{get_share_dir, normalize_url, slugify};
+use crate::util::{detect_browser, get_share_dir, normalize_url, slugify};
 
 pub fn install_app(
     url: &str,
@@ -73,7 +73,9 @@ pub fn install_app(
 
     println!("Icon saved at: {}", icon_path.display());
 
-    let browser_name = browser_arg.unwrap_or_else(|| String::from("chromium"));
+    let browser_name = browser_arg
+        .or_else(detect_browser)
+        .unwrap_or_else(|| String::from("chromium"));
 
     create_desktop_file(name, &icon_path, &url, &browser_name, &desktop_file_path)?;
     println!("Desktop file created at: {}", desktop_file_path.display());

@@ -29,3 +29,33 @@ pub fn normalize_url(url: &str) -> String {
         format!("https://{url}")
     }
 }
+
+pub fn detect_browser() -> Option<String> {
+    let browsers = [
+        "chromium",
+        "brave-browser",
+        "google-chrome-stable",
+        "ungoogled-chromium",
+        "vivaldi",
+        "microsoft-edge-stable",
+        "zen-browser",
+        "firefox",
+    ];
+
+    if let Ok(path) = std::env::var("PATH") {
+        for browser in browsers.iter() {
+            for dir in std::env::split_paths(&path) {
+                let p = dir.join(browser);
+                if p.is_file() {
+                    use std::os::unix::fs::PermissionsExt;
+                    if let Ok(metadata) = p.metadata()
+                        && metadata.permissions().mode() & 0o111 != 0
+                    {
+                        return Some(browser.to_string());
+                    }
+                }
+            }
+        }
+    }
+    None
+}

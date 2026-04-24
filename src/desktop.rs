@@ -19,17 +19,26 @@ pub fn create_desktop_file(
         .ok_or("Invalid desktop file path")?;
     std::fs::create_dir_all(applications_dir)?;
 
+    let exec_args = if browser == "firefox"
+        || browser == "zen-browser"
+        || browser.contains("firefox")
+        || browser.contains("zen")
+    {
+        format!("{} --ssb {}", browser, url)
+    } else {
+        format!("{} --app={}", browser, url)
+    };
+
     let contents = format!(
         "[Desktop Entry]
 Name={}
-Exec={} --app={}
+Exec={}
 Icon={}
 Type=Application
 Terminal=false
 Categories=Network;",
         name,
-        browser,
-        url,
+        exec_args,
         icon_path.display()
     );
 
