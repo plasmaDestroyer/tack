@@ -20,8 +20,11 @@ tack update --all
 tack remove <name>
 tack export [file]
 tack import <file>
+tack completions <bash|zsh|fish>
+tack manpage
 tack config show
 tack config set <key> <value>
+tack --version
 ```
 
 ### Install an App
@@ -145,6 +148,30 @@ tack config set browser brave-browser
 tack config set categories "Network;Entertainment;"
 ```
 
+### Shell Completions
+
+Generate tab-completion scripts for your shell:
+
+```bash
+# Bash — append to ~/.bashrc
+tack completions bash >> ~/.bashrc
+
+# Zsh — add to fpath
+tack completions zsh > ~/.zfunc/_tack
+
+# Fish
+tack completions fish > ~/.config/fish/completions/tack.fish
+```
+
+### Man Page
+
+View or install the man page:
+
+```bash
+tack manpage | man -l -                                  # view directly
+tack manpage | sudo tee /usr/local/share/man/man1/tack.1  # install
+```
+
 ## Features
 
 - **Auto icon fetching** — svgl.app → HTML `<link>` tags → `/favicon.ico` → Google Favicons API
@@ -157,6 +184,9 @@ tack config set categories "Network;Entertainment;"
 - **Dry run** (`--dry-run`) — preview changes without touching the filesystem
 - **Quiet/Verbose** (`--quiet`, `--verbose`) — control output verbosity
 - **Persistent config** — `~/.config/tack/config.toml` for defaults
+- **Export/Import** — portable JSON backup and restore
+- **Shell completions** — bash, zsh, fish via `tack completions`
+- **Man page** — auto-generated via `tack manpage`
 
 ## Requirements
 
@@ -166,7 +196,13 @@ tack config set categories "Network;Entertainment;"
 
 ## Installation
 
-Build from source:
+### AUR (Arch Linux)
+
+```bash
+yay -S tack-cli
+```
+
+### Build from source
 
 ```bash
 git clone https://github.com/plasmaDestroyer/tack.git
