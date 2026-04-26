@@ -11,6 +11,8 @@ use std::error::Error;
 use std::io::{self, Write};
 
 use commands::config::handle_config;
+use commands::export::export_apps;
+use commands::import::import_apps;
 use commands::install::install_app;
 use commands::list::list_apps;
 use commands::open::open_app;
@@ -88,6 +90,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         "config" => {
             handle_config(&args[2..])?;
         }
+        "export" => {
+            let output_path = args.get(2).map(|s| s.as_str());
+            export_apps(output_path)?;
+        }
+        "import" => {
+            if args.len() < 3 {
+                output::error("Usage: tack import <file>");
+                std::process::exit(1);
+            }
+            import_apps(&args[2], dry_run)?;
+        }
         _ => {
             let force = args.contains(&"--force".to_string());
             let mut icon_path = None;
@@ -156,6 +169,8 @@ fn print_usage() {
     eprintln!(
         "       tack update <name> [--name NAME] [--url URL] [--browser BROWSER] [--icon PATH] [--dry-run]"
     );
+    eprintln!("       tack export [file]");
+    eprintln!("       tack import <file>");
     eprintln!("       tack config show");
     eprintln!("       tack config set <key> <value>");
 }
