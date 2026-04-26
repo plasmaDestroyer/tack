@@ -33,6 +33,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Quick scan for global flags
     for arg in &args[1..] {
         match arg.as_str() {
+            "--version" | "-V" => {
+                println!("tack {}", env!("CARGO_PKG_VERSION"));
+                std::process::exit(0);
+            }
             "--dry-run" => dry_run = true,
             "--quiet" | "-q" => mode = OutputMode::Quiet,
             "--verbose" | "-v" => mode = OutputMode::Verbose,
@@ -177,6 +181,7 @@ fn print_usage() {
     eprintln!(
         "Usage: tack <url> <name> [--force] [--icon PATH] [--browser BROWSER] [--dry-run] [--quiet] [--verbose]"
     );
+    eprintln!("       tack -V, --version                (print version)");
     eprintln!("       tack -i                           (interactive mode)");
     eprintln!("       tack list");
     eprintln!("       tack open <name>");
