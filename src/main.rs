@@ -17,7 +17,7 @@ use commands::install::install_app;
 use commands::list::list_apps;
 use commands::open::open_app;
 use commands::remove::remove_app;
-use commands::update::{parse_update_flags, update_app};
+use commands::update::{parse_update_flags, update_all_apps, update_app};
 use output::OutputMode;
 use util::{detect_browsers, get_share_dir};
 
@@ -80,12 +80,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         "update" => {
             if args.len() < 3 {
                 output::error(
-                    "Usage: tack update <name> [--name NAME] [--url URL] [--browser BROWSER] [--icon PATH]",
+                    "Usage: tack update <name> [--name NAME] [--url URL] [--browser BROWSER] [--icon PATH]\n       tack update --all",
                 );
                 std::process::exit(1);
             }
-            let flags = parse_update_flags(&args[3..])?;
-            update_app(&args[2], flags, dry_run)?;
+            if args[2] == "--all" {
+                update_all_apps(dry_run)?;
+            } else {
+                let flags = parse_update_flags(&args[3..])?;
+                update_app(&args[2], flags, dry_run)?;
+            }
         }
         "config" => {
             handle_config(&args[2..])?;
@@ -169,6 +173,7 @@ fn print_usage() {
     eprintln!(
         "       tack update <name> [--name NAME] [--url URL] [--browser BROWSER] [--icon PATH] [--dry-run]"
     );
+    eprintln!("       tack update --all                 (update all apps)");
     eprintln!("       tack export [file]");
     eprintln!("       tack import <file>");
     eprintln!("       tack config show");

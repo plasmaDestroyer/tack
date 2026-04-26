@@ -161,3 +161,24 @@ pub fn update_app(
     output::success(&format!("✓ {} updated successfully!", final_name));
     Ok(())
 }
+
+pub fn update_all_apps(dry_run: bool) -> Result<(), Box<dyn Error>> {
+    let share_dir = get_share_dir()?;
+    let manifest_path = get_manifest_path(&share_dir);
+    let entries = load_manifest(&manifest_path)?;
+
+    if entries.is_empty() {
+        output::info("No apps installed to update.");
+        return Ok(());
+    }
+
+    for app in entries {
+        output::info(&format!("Updating {}...", app.name));
+        if let Err(e) = update_app(&app.name, UpdateFlags::default(), dry_run) {
+            output::error(&format!("Failed to update {}: {}", app.name, e));
+        }
+    }
+
+    output::success("All apps updated successfully!");
+    Ok(())
+}
