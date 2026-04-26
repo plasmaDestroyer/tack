@@ -10,6 +10,7 @@ mod util;
 use std::error::Error;
 use std::io::{self, Write};
 
+use commands::completions::generate_completions;
 use commands::config::handle_config;
 use commands::export::export_apps;
 use commands::import::import_apps;
@@ -105,6 +106,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             import_apps(&args[2], dry_run)?;
         }
+        "completions" => {
+            if args.len() < 3 {
+                output::error("Usage: tack completions <bash|zsh|fish>");
+                std::process::exit(1);
+            }
+            generate_completions(&args[2])?;
+        }
         _ => {
             let force = args.contains(&"--force".to_string());
             let mut icon_path = None;
@@ -176,6 +184,7 @@ fn print_usage() {
     eprintln!("       tack update --all                 (update all apps)");
     eprintln!("       tack export [file]");
     eprintln!("       tack import <file>");
+    eprintln!("       tack completions <bash|zsh|fish>");
     eprintln!("       tack config show");
     eprintln!("       tack config set <key> <value>");
 }
