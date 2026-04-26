@@ -16,7 +16,10 @@ tack -i                           # interactive mode
 tack list
 tack open <name>
 tack update <name> [--name NAME] [--url URL] [--browser BROWSER] [--icon PATH] [--dry-run]
+tack update --all
 tack remove <name>
+tack export [file]
+tack import <file>
 tack config show
 tack config set <key> <value>
 ```
@@ -95,6 +98,27 @@ tack update YouTube --name "YouTube Music" --url https://music.youtube.com
 ```
 
 If no flags are provided, `tack update` runs in "repair mode", which re-fetches the favicon and regenerates the `.desktop` file.
+
+To update all applications at once (e.g. re-fetching missing icons and regenerating desktop files for every installed app):
+
+```bash
+tack update --all
+```
+
+### Export and Import
+
+You can export your installed apps manifest as a portable JSON file, and restore them on another machine:
+
+```bash
+# Dump JSON to stdout
+tack export
+
+# Save to a file
+tack export backup.json
+
+# Restore from backup file
+tack import backup.json
+```
 
 ### Remove an App
 
