@@ -68,6 +68,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     match args[1].as_str() {
+        "help" => {
+            print_usage();
+            std::process::exit(0);
+        }
         "list" => {
             let share_dir = get_share_dir()?;
             list_apps(&share_dir)?;
