@@ -37,6 +37,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 println!("tack {}", env!("CARGO_PKG_VERSION"));
                 std::process::exit(0);
             }
+            "--help" | "-h" => {
+                print_usage();
+                std::process::exit(0);
+            }
             "--dry-run" => dry_run = true,
             "--quiet" | "-q" => mode = OutputMode::Quiet,
             "--verbose" | "-v" => mode = OutputMode::Verbose,
