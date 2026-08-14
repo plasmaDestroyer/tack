@@ -218,7 +218,7 @@ fn prompt(label: &str) -> String {
 fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
     output::info("🔧 tack — interactive setup\n");
 
-    // 1. URL — fetch the icon right away for per-step verification
+    // 1. URL — kick off icon fetch in a background thread
     let url = prompt("Enter the URL");
     if url.is_empty() {
         output::error("URL cannot be empty.");
@@ -230,18 +230,26 @@ fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
         std::process::exit(1);
     }
 
-    output::info("Fetching favicon...");
-    let fetched_bytes = if check_online() {
-        icon::fetch_favicon(&url)
-    } else {
-        output::warn("No network connection.");
-        None
-    };
-    let fetched_format = fetched_bytes.as_deref().and_then(icon::detect_format);
+    output::info("Fetching favicon in background...");
+    let (tx, rx) = std::sync::mpsc::channel::<Option<(Vec<u8>, icon::ImageFormat)>>();
+    let fetch_url = url.clone();
+    std::thread::spawn(move || {
+        let _ = tx.send(fetch_favicon_async(&fetch_url));
+    });
+
+    // 2. Name — typed while the favicon fetch runs in parallel
+    let name = prompt("Enter the app name");
+    if name.is_empty() {
+        output::error("Name cannot be empty.");
+        std::process::exit(1);
+    }
+
+    // Wait for the background fetch to finish
+    let fetched = rx.recv().unwrap_or(None);
 
     // Save the fetched icon to a temp file so we can preview it immediately
-    let preview_path = match (&fetched_bytes, fetched_format) {
-        (Some(bytes), Some(format)) => {
+    let preview_path = match &fetched {
+        Some((bytes, format)) => {
             let ext = match format {
                 icon::ImageFormat::Png => "png",
                 icon::ImageFormat::Svg => "svg",
@@ -268,13 +276,6 @@ fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
             None
         }
     };
-
-    // 2. Name
-    let name = prompt("Enter the app name");
-    if name.is_empty() {
-        output::error("Name cannot be empty.");
-        std::process::exit(1);
-    }
 
     // 3. Browser (numbered list of detected browsers)
     let browsers = detect_browsers();
@@ -346,6 +347,17 @@ fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
     }
 
     result
+}
+
+/// Fetch the favicon off the main thread. Returns (bytes, format) on success.
+fn fetch_favicon_async(url: &str) -> Option<(Vec<u8>, icon::ImageFormat)> {
+    if !check_online() {
+        output::warn("No network connection.");
+        return None;
+    }
+    let bytes = icon::fetch_favicon(url)?;
+    let format = icon::detect_format(&bytes)?;
+    Some((bytes, format))
 }
 
 /// Render an icon inline in the terminal via sixel (img2sixel).
