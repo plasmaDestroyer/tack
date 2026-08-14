@@ -6,6 +6,7 @@ use crate::output;
 
 pub const DEFAULT_ICON: &[u8] = include_bytes!("../assets/default.png");
 
+#[derive(Debug)]
 pub enum ImageFormat {
     Png,
     Svg,

@@ -20,7 +20,7 @@ use commands::open::open_app;
 use commands::remove::remove_app;
 use commands::update::{parse_update_flags, update_all_apps, update_app};
 use output::OutputMode;
-use util::{detect_browsers, get_share_dir};
+use util::{check_online, detect_browsers, get_share_dir, normalize_url, validate_url};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().collect();
@@ -218,12 +218,56 @@ fn prompt(label: &str) -> String {
 fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
     output::info("🔧 tack — interactive setup\n");
 
-    // 1. URL
+    // 1. URL — fetch the icon right away for per-step verification
     let url = prompt("Enter the URL");
     if url.is_empty() {
         output::error("URL cannot be empty.");
         std::process::exit(1);
     }
+    let url = normalize_url(&url);
+    if let Err(msg) = validate_url(&url) {
+        output::error(&msg);
+        std::process::exit(1);
+    }
+
+    output::info("Fetching favicon...");
+    let fetched_bytes = if check_online() {
+        icon::fetch_favicon(&url)
+    } else {
+        output::warn("No network connection.");
+        None
+    };
+    let fetched_format = fetched_bytes.as_deref().and_then(icon::detect_format);
+
+    // Save the fetched icon to a temp file so we can preview it immediately
+    let preview_path = match (&fetched_bytes, fetched_format) {
+        (Some(bytes), Some(format)) => {
+            let ext = match format {
+                icon::ImageFormat::Png => "png",
+                icon::ImageFormat::Svg => "svg",
+                icon::ImageFormat::Ico => "png",
+            };
+            let mut path =
+                std::env::temp_dir().join(format!("tack_icon_{}", std::process::id()));
+            path.set_extension(ext);
+            let out = if matches!(format, icon::ImageFormat::Ico) {
+                ico::ico_to_png(bytes).unwrap_or_else(|_| bytes.clone())
+            } else {
+                bytes.clone()
+            };
+            if std::fs::write(&path, &out).is_ok() {
+                output::success(&format!("Icon fetched: {:?}", format));
+                preview_icon(&path);
+                Some(path)
+            } else {
+                None
+            }
+        }
+        _ => {
+            output::warn("Could not fetch an icon — will use default or custom.");
+            None
+        }
+    };
 
     // 2. Name
     let name = prompt("Enter the app name");
@@ -258,39 +302,62 @@ fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
         }
     };
 
-    // 4. Icon
+    // 4. Icon — verify the fetched one against custom/default
     output::info("\nIcon source:");
-    output::info("  [1] Fetch from URL (default)");
-    output::info("  [2] Custom local file");
-    output::info("  [3] Use default icon");
-    let icon_choice = prompt("Pick an option (1/2/3)");
-    let icon_arg = match icon_choice.as_str() {
-        "2" => {
-            let path = prompt("Enter the icon file path");
-            if path.is_empty() {
-                output::error("Icon path cannot be empty.");
-                std::process::exit(1);
-            }
-            Some(path)
+    let fetched_num = if preview_path.is_some() { Some(1) } else { None };
+    let custom_num = fetched_num.map(|n| n + 1).unwrap_or(1);
+    let default_num = custom_num + 1;
+    if let Some(n) = fetched_num {
+        output::info(&format!("  [{}] Use fetched icon (default)", n));
+    }
+    output::info(&format!("  [{}] Custom local file", custom_num));
+    output::info(&format!("  [{}] Use default icon", default_num));
+    let icon_choice = prompt("Pick an option");
+
+    let icon_arg = if Some(icon_choice.trim()) == fetched_num.map(|n| n.to_string()).as_deref() {
+        (preview_path.as_ref().map(|p| p.display().to_string()), true).0
+    } else if icon_choice.trim() == custom_num.to_string() {
+        let path = prompt("Enter the icon file path");
+        if path.is_empty() {
+            output::error("Icon path cannot be empty.");
+            std::process::exit(1);
         }
-        "3" => {
-            // We'll pass a sentinel — install_app will use DEFAULT_ICON if fetch returns None,
-            // but we need a different approach. We'll set icon_arg to None and set a flag.
-            // Actually, the simplest: pass the embedded default icon path. But that doesn't exist as a file.
-            // Instead, we'll handle this: if user picks "3", we skip the fetch entirely.
-            // Let's use a special marker that install_app recognizes.
-            // Better approach: just don't pass an icon arg, and let the logic handle it.
-            // But that would trigger a favicon fetch. We need to use --icon with a temp default.
-            // Simplest: write the default icon to a temp location and pass that path.
-            let share_dir = get_share_dir()?;
-            let default_path = share_dir.join("icons").join("_default_tack.png");
-            std::fs::create_dir_all(default_path.parent().unwrap())?;
-            std::fs::write(&default_path, icon::DEFAULT_ICON)?;
-            Some(default_path.display().to_string())
+        let path_buf = std::path::PathBuf::from(&path);
+        if !path_buf.exists() {
+            output::error(&format!("Icon file not found: {}", path));
+            std::process::exit(1);
         }
-        _ => None, // "1" or Enter — fetch from URL
+        Some(path)
+    } else {
+        let share_dir = get_share_dir()?;
+        let default_path = share_dir.join("icons").join("_default_tack.png");
+        std::fs::create_dir_all(default_path.parent().unwrap())?;
+        std::fs::write(&default_path, icon::DEFAULT_ICON)?;
+        Some(default_path.display().to_string())
     };
 
     output::info(""); // blank line before install output
-    install_app(&url, &name, false, icon_arg, browser, dry_run)
+    let result = install_app(&url, &name, false, icon_arg, browser, dry_run);
+
+    // Clean up the temp preview file — install_app has already copied it
+    if let Some(path) = &preview_path {
+        let _ = std::fs::remove_file(path);
+    }
+
+    result
+}
+
+/// Render an icon inline in the terminal via sixel (img2sixel).
+/// Returns true if the preview was shown.
+fn preview_icon(path: &std::path::Path) -> bool {
+    if !path.extension().map(|e| e == "png").unwrap_or(false) {
+        output::info("SVG icons can't be previewed in the terminal.");
+        return false;
+    }
+    if let Ok(output) = std::process::Command::new("img2sixel").arg(path).output() {
+        print!("{}", String::from_utf8_lossy(&output.stdout));
+        return true;
+    }
+    output::info("img2sixel not installed — skipping icon preview.");
+    false
 }
