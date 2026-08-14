@@ -314,8 +314,9 @@ fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
     output::info(&format!("  [{}] Use default icon", default_num));
     let icon_choice = prompt("Pick an option");
 
-    let icon_arg = if Some(icon_choice.trim()) == fetched_num.map(|n| n.to_string()).as_deref() {
-        (preview_path.as_ref().map(|p| p.display().to_string()), true).0
+    let icon_arg = if fetched_num.is_some() && icon_choice.trim().is_empty() {
+        // Enter = default = fetched icon
+        preview_path.as_ref().map(|p| p.display().to_string())
     } else if icon_choice.trim() == custom_num.to_string() {
         let path = prompt("Enter the icon file path");
         if path.is_empty() {
