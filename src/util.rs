@@ -86,6 +86,7 @@ pub fn check_online() -> bool {
 const KNOWN_BROWSERS: &[&str] = &[
     "chromium",
     "brave-browser",
+    "brave",
     "google-chrome-stable",
     "google-chrome-beta",
     "google-chrome-dev",
