@@ -87,6 +87,8 @@ const KNOWN_BROWSERS: &[&str] = &[
     "chromium",
     "brave-browser",
     "google-chrome-stable",
+    "google-chrome-beta",
+    "google-chrome-dev",
     "ungoogled-chromium",
     "vivaldi",
     "microsoft-edge-stable",
