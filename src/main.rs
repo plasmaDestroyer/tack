@@ -19,8 +19,9 @@ use commands::list::list_apps;
 use commands::open::open_app;
 use commands::remove::remove_app;
 use commands::update::{parse_update_flags, update_all_apps, update_app};
+use desktop::get_desktop_file_path;
 use output::OutputMode;
-use util::{check_online, detect_browsers, get_share_dir, normalize_url, validate_url};
+use util::{check_online, detect_browsers, get_share_dir, normalize_url, slugify, validate_url};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().collect();
@@ -237,10 +238,47 @@ fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
         let _ = tx.send(fetch_favicon_async(&fetch_url));
     });
 
-    // 2. Name — typed while the favicon fetch runs in parallel
+    // 2. Browser (numbered list of detected browsers)
+    let browsers = detect_browsers();
+    let browser = if browsers.is_empty() {
+        output::warn("No browsers detected on PATH. Falling back to 'chromium'.");
+        None
+    } else {
+        output::info("\nAvailable browsers:");
+        for (i, b) in browsers.iter().enumerate() {
+            output::info(&format!("  [{}] {}", i + 1, b));
+        }
+        let choice = prompt("Pick a browser number (or press Enter for default)");
+        if choice.is_empty() {
+            Some(browsers[0].clone())
+        } else if let Ok(n) = choice.parse::<usize>() {
+            if n >= 1 && n <= browsers.len() {
+                Some(browsers[n - 1].clone())
+            } else {
+                output::warn("Invalid choice — using first detected browser.");
+                Some(browsers[0].clone())
+            }
+        } else {
+            output::warn("Invalid input — using first detected browser.");
+            Some(browsers[0].clone())
+        }
+    };
+
+    // 3. Name — typed while the favicon fetch runs in parallel
     let name = prompt("Enter the app name");
     if name.is_empty() {
         output::error("Name cannot be empty.");
+        std::process::exit(1);
+    }
+
+    // Fail fast if the app already exists
+    let slug = slugify(&name);
+    let share_dir = get_share_dir()?;
+    if get_desktop_file_path(&slug, &share_dir).exists() {
+        output::error(&format!(
+            "{} is already installed. Use `tack update {}` to modify it.",
+            name, name
+        ));
         std::process::exit(1);
     }
 
@@ -280,32 +318,6 @@ fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
         }
     };
 
-    // 3. Browser (numbered list of detected browsers)
-    let browsers = detect_browsers();
-    let browser = if browsers.is_empty() {
-        output::warn("No browsers detected on PATH. Falling back to 'chromium'.");
-        None
-    } else {
-        output::info("\nAvailable browsers:");
-        for (i, b) in browsers.iter().enumerate() {
-            output::info(&format!("  [{}] {}", i + 1, b));
-        }
-        let choice = prompt("Pick a browser number (or press Enter for default)");
-        if choice.is_empty() {
-            Some(browsers[0].clone())
-        } else if let Ok(n) = choice.parse::<usize>() {
-            if n >= 1 && n <= browsers.len() {
-                Some(browsers[n - 1].clone())
-            } else {
-                output::warn("Invalid choice — using first detected browser.");
-                Some(browsers[0].clone())
-            }
-        } else {
-            output::warn("Invalid input — using first detected browser.");
-            Some(browsers[0].clone())
-        }
-    };
-
     // 4. Icon — verify the fetched one against custom/default
     output::info("\nIcon source:");
     let fetched_num = if preview_path.is_some() { Some(1) } else { None };
@@ -334,7 +346,6 @@ fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
         }
         Some(path)
     } else {
-        let share_dir = get_share_dir()?;
         let default_path = share_dir.join("icons").join("_default_tack.png");
         std::fs::create_dir_all(default_path.parent().unwrap())?;
         std::fs::write(&default_path, icon::DEFAULT_ICON)?;
