@@ -63,8 +63,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     if args.len() < 2 {
-        print_usage();
-        std::process::exit(1);
+        return run_interactive(dry_run);
     }
 
     match args[1].as_str() {
