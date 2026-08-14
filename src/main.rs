@@ -247,7 +247,8 @@ fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
     // Wait for the background fetch to finish
     let fetched = rx.recv().unwrap_or(None);
 
-    // Save the fetched icon to a temp file so we can preview it immediately
+    // Save the fetched icon to a temp directory so we can preview it immediately.
+    // Kept around for now — cleaned up later when we add temp management.
     let preview_path = match &fetched {
         Some((bytes, format)) => {
             let ext = match format {
@@ -255,15 +256,17 @@ fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
                 icon::ImageFormat::Svg => "svg",
                 icon::ImageFormat::Ico => "png",
             };
-            let mut path =
-                std::env::temp_dir().join(format!("tack_icon_{}", std::process::id()));
-            path.set_extension(ext);
+            let tmp_dir =
+                std::env::temp_dir().join(format!("tack_{}", std::process::id()));
+            let path = tmp_dir.join(format!("icon.{}", ext));
             let out = if matches!(format, icon::ImageFormat::Ico) {
                 ico::ico_to_png(bytes).unwrap_or_else(|_| bytes.clone())
             } else {
                 bytes.clone()
             };
-            if std::fs::write(&path, &out).is_ok() {
+            if std::fs::create_dir_all(&tmp_dir).is_ok()
+                && std::fs::write(&path, &out).is_ok()
+            {
                 output::success(&format!("Icon fetched: {:?}", format));
                 preview_icon(&path);
                 Some(path)
@@ -339,14 +342,7 @@ fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
     };
 
     output::info(""); // blank line before install output
-    let result = install_app(&url, &name, false, icon_arg, browser, dry_run);
-
-    // Clean up the temp preview file — install_app has already copied it
-    if let Some(path) = &preview_path {
-        let _ = std::fs::remove_file(path);
-    }
-
-    result
+    install_app(&url, &name, false, icon_arg, browser, dry_run)
 }
 
 /// Fetch the favicon off the main thread. Returns (bytes, format) on success.
