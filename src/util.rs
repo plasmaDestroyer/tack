@@ -122,3 +122,24 @@ pub fn detect_browsers() -> Vec<String> {
     }
     found
 }
+
+fn is_on_path(name: &str) -> bool {
+    if let Ok(path) = std::env::var("PATH") {
+        std::env::split_paths(&path).any(|dir| dir.join(name).is_file())
+    } else {
+        false
+    }
+}
+
+/// Resolve a browser name to an executable present on PATH.
+/// Tries an exact match first, then a prefix match against known browsers
+/// (e.g. "brave" -> "brave-browser").
+pub fn resolve_browser(name: &str) -> Option<String> {
+    if is_on_path(name) {
+        return Some(name.to_string());
+    }
+    KNOWN_BROWSERS
+        .iter()
+        .find(|b| b.starts_with(name) && is_on_path(b))
+        .map(|b| b.to_string())
+}

@@ -79,7 +79,24 @@ pub fn update_app(
         entry.url = normalized;
     }
     if let Some(new_browser) = &flags.browser {
-        entry.browser = new_browser.clone();
+        match crate::util::resolve_browser(new_browser) {
+            Some(resolved) => {
+                if resolved != *new_browser {
+                    output::info(&format!(
+                        "Resolved browser '{}' to '{}'",
+                        new_browser, resolved
+                    ));
+                }
+                entry.browser = resolved;
+            }
+            None => {
+                output::error(&format!(
+                    "Browser '{}' not found on PATH. Check the name with `which {}`.",
+                    new_browser, new_browser
+                ));
+                std::process::exit(1);
+            }
+        }
     }
     if let Some(new_name) = &flags.name {
         entry.name = new_name.clone();

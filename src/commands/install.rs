@@ -6,7 +6,8 @@ use crate::icon::{DEFAULT_ICON, ImageFormat, detect_format, fetch_favicon, save_
 use crate::manifest::{AppEntry, add_or_update_app, get_manifest_path};
 use crate::output;
 use crate::util::{
-    check_online, detect_browser, get_share_dir, normalize_url, slugify, validate_url,
+    check_online, detect_browser, get_share_dir, normalize_url, resolve_browser, slugify,
+    validate_url,
 };
 
 pub fn install_app(
@@ -96,10 +97,34 @@ pub fn install_app(
     output::verbose(&format!("Icon path: {}", icon_path.display()));
 
     let config = crate::config::load_config();
+    let user_supplied_browser = browser_arg.is_some() || config.browser.is_some();
     let browser_name = browser_arg
         .or(config.browser)
         .or_else(detect_browser)
         .unwrap_or_else(|| String::from("chromium"));
+
+    let browser_name = if user_supplied_browser {
+        match resolve_browser(&browser_name) {
+            Some(resolved) => {
+                if resolved != browser_name {
+                    output::info(&format!(
+                        "Resolved browser '{}' to '{}'",
+                        browser_name, resolved
+                    ));
+                }
+                resolved
+            }
+            None => {
+                output::error(&format!(
+                    "Browser '{}' not found on PATH. Check the name with `which {}`.",
+                    browser_name, browser_name
+                ));
+                std::process::exit(1);
+            }
+        }
+    } else {
+        browser_name
+    };
 
     output::verbose(&format!("Browser: {}", browser_name));
 
