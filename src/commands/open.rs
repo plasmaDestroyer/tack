@@ -2,19 +2,17 @@ use std::error::Error;
 use std::os::unix::process::CommandExt;
 use std::process::Stdio;
 
-use crate::manifest::{get_manifest_path, load_manifest};
+use crate::manifest::{find_app_index, get_manifest_path, load_manifest};
 use crate::output;
-use crate::util::{get_share_dir, slugify, validate_app_browser};
+use crate::util::{get_share_dir, validate_app_browser};
 
 pub fn open_app(name: &str, dry_run: bool) -> Result<(), Box<dyn Error>> {
     let share_dir = get_share_dir()?;
-    let slug = slugify(name);
     let manifest_path = get_manifest_path(&share_dir);
     let entries = load_manifest(&manifest_path)?;
 
-    let entry = entries
-        .iter()
-        .find(|e| e.slug == slug)
+    let entry = find_app_index(&entries, name)
+        .map(|index| &entries[index])
         .ok_or_else(|| format!("App '{}' is not installed.", name))?;
     validate_app_browser(&entry.browser)?;
 

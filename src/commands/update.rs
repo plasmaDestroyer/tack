@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use crate::desktop::{create_desktop_file, get_desktop_file_path};
 use crate::icon::{DEFAULT_ICON, ImageFormat, detect_format, fetch_favicon, save_icon};
-use crate::manifest::{get_manifest_path, load_manifest, save_manifest};
+use crate::manifest::{find_app_index, get_manifest_path, load_manifest, save_manifest};
 use crate::output;
 use crate::util::{
     check_online, get_share_dir, normalize_url, slugify, validate_app_browser, validate_url,
@@ -57,14 +57,22 @@ pub fn update_app(
     dry_run: bool,
 ) -> Result<(), Box<dyn Error>> {
     let share_dir = get_share_dir()?;
-    let slug = slugify(current_name);
     let manifest_path = get_manifest_path(&share_dir);
     let mut entries = load_manifest(&manifest_path)?;
 
-    let entry = entries
-        .iter_mut()
-        .find(|e| e.slug == slug)
+    let index = find_app_index(&entries, current_name)
         .ok_or_else(|| format!("App '{}' is not installed.", current_name))?;
+    if let Some(new_name) = &flags.name {
+        let new_slug = slugify(new_name);
+        if new_slug.is_empty() {
+            return Err("App name must contain an ASCII letter or digit.".into());
+        }
+        if find_app_index(&entries, new_name).is_some_and(|other| other != index) {
+            return Err(format!("App '{}' is already installed.", new_name).into());
+        }
+    }
+    let entry = &mut entries[index];
+    let slug = entry.slug.clone();
 
     let has_overrides = flags.icon.is_some()
         || flags.url.is_some()

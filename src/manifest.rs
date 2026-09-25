@@ -3,6 +3,7 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use crate::output;
+use crate::util::slugify;
 
 #[derive(Serialize, Deserialize)]
 pub struct AppEntry {
@@ -27,6 +28,13 @@ pub fn load_manifest(path: &Path) -> Result<Vec<AppEntry>, Box<dyn Error>> {
     let contents = std::fs::read_to_string(path)?;
     let entries: Vec<AppEntry> = serde_json::from_str(&contents)?;
     Ok(entries)
+}
+
+pub fn find_app_index(entries: &[AppEntry], name: &str) -> Option<usize> {
+    let slug = slugify(name);
+    entries
+        .iter()
+        .position(|entry| entry.slug == slug || slugify(&entry.name) == slug)
 }
 
 pub fn save_manifest(

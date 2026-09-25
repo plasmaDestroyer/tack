@@ -3,7 +3,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::desktop::{create_desktop_file, get_desktop_file_path};
 use crate::icon::{DEFAULT_ICON, ImageFormat, detect_format, fetch_favicon, save_icon};
-use crate::manifest::{AppEntry, add_or_update_app, get_manifest_path};
+use crate::manifest::{
+    AppEntry, add_or_update_app, find_app_index, get_manifest_path, load_manifest,
+};
 use crate::output;
 use crate::util::{
     check_online, detect_browser, get_share_dir, normalize_url, resolve_browser, slugify,
@@ -42,6 +44,11 @@ pub fn install_app(
             name, name
         ));
         std::process::exit(1);
+    }
+    let manifest_path = get_manifest_path(&share_dir);
+    let entries = load_manifest(&manifest_path)?;
+    if find_app_index(&entries, name).is_some_and(|index| !force || entries[index].slug != slug) {
+        return Err(format!("App '{}' is already installed.", name).into());
     }
 
     if dry_run {
@@ -166,7 +173,6 @@ pub fn install_app(
         ));
     }
 
-    let manifest_path = get_manifest_path(&share_dir);
     let entry = AppEntry {
         name: name.to_string(),
         slug,

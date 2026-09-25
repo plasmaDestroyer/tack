@@ -2,17 +2,16 @@ use std::error::Error;
 use std::path::Path;
 
 use crate::desktop::get_desktop_file_path;
-use crate::manifest::{get_manifest_path, load_manifest, save_manifest};
+use crate::manifest::{find_app_index, get_manifest_path, load_manifest, save_manifest};
 use crate::output;
-use crate::util::{get_share_dir, slugify};
+use crate::util::get_share_dir;
 
 pub fn remove_app(name: &str, dry_run: bool) -> Result<(), Box<dyn Error>> {
     let share_dir = get_share_dir()?;
-    let slug = slugify(name);
     let manifest_path = get_manifest_path(&share_dir);
 
     let mut entries = load_manifest(&manifest_path)?;
-    let position = entries.iter().position(|e| e.slug == slug);
+    let position = find_app_index(&entries, name);
 
     let entry = match position {
         Some(i) => entries.remove(i),
@@ -23,7 +22,7 @@ pub fn remove_app(name: &str, dry_run: bool) -> Result<(), Box<dyn Error>> {
     };
 
     // Delete .desktop file
-    let desktop_file_path = get_desktop_file_path(&slug, &share_dir);
+    let desktop_file_path = get_desktop_file_path(&entry.slug, &share_dir);
     if desktop_file_path.exists() {
         if dry_run {
             output::dry_run(&format!("would remove: {}", desktop_file_path.display()));
