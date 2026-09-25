@@ -44,7 +44,11 @@ pub fn install_app(
         std::process::exit(1);
     }
 
-    output::info(&format!("Installing {} from {}", name, url));
+    if dry_run {
+        output::info(&format!("Previewing installation of {} from {}", name, url));
+    } else {
+        output::info(&format!("Installing {} from {}", name, url));
+    }
 
     let mut user_supplied_icon = false;
 
@@ -154,10 +158,12 @@ pub fn install_app(
         &desktop_file_path,
         dry_run,
     )?;
-    output::info(&format!(
-        "Desktop file created at: {}",
-        desktop_file_path.display()
-    ));
+    if !dry_run {
+        output::info(&format!(
+            "Desktop file created at: {}",
+            desktop_file_path.display()
+        ));
+    }
 
     let manifest_path = get_manifest_path(&share_dir);
     let entry = AppEntry {
@@ -170,9 +176,10 @@ pub fn install_app(
         user_supplied_icon,
     };
     add_or_update_app(&manifest_path, entry, dry_run)?;
-    output::info(&format!("Manifest updated at: {}", manifest_path.display()));
-
-    output::success(&format!("✓ {} installed successfully!", name));
+    if !dry_run {
+        output::info(&format!("Manifest updated at: {}", manifest_path.display()));
+        output::success(&format!("✓ {} installed successfully!", name));
+    }
 
     Ok(())
 }

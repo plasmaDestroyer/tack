@@ -17,7 +17,7 @@ tack list
 tack open <name>
 tack update <name> [--name NAME] [--url URL] [--browser BROWSER] [--icon PATH] [--dry-run]
 tack update --all
-tack remove <name>
+tack remove <name> [--dry-run]
 tack export [file]
 tack import <file>
 tack completions <bash|zsh|fish>
@@ -61,7 +61,7 @@ This will show detected browsers as a numbered list and let you choose an icon s
 
 ### Dry Run
 
-Preview what `tack` would do without writing anything to disk:
+Add `--dry-run` to install, update, remove, import, export, config set, open, or interactive mode to preview without writing files or launching a browser:
 
 ```bash
 tack https://youtube.com YouTube --dry-run

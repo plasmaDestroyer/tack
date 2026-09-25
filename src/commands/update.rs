@@ -112,7 +112,9 @@ pub fn update_app(
             let format = detect_format(&bytes)
                 .ok_or("Unsupported icon format (expected PNG, SVG, or ICO)")?;
             let saved = save_icon(&slug, &bytes, format, &share_dir, dry_run)?;
-            output::info(&format!("Icon saved at: {}", saved.display()));
+            if !dry_run {
+                output::info(&format!("Icon saved at: {}", saved.display()));
+            }
             entry.icon_path = saved.display().to_string();
             entry.user_supplied_icon = true;
         } else {
@@ -147,7 +149,9 @@ pub fn update_app(
                 output::warn("Favicon not found — restoring default icon.");
                 save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir, dry_run)
             }?;
-            output::info(&format!("Icon saved at: {}", icon_path.display()));
+            if !dry_run {
+                output::info(&format!("Icon saved at: {}", icon_path.display()));
+            }
             entry.icon_path = icon_path.display().to_string();
         }
     }
@@ -165,18 +169,21 @@ pub fn update_app(
         &desktop_file_path,
         dry_run,
     )?;
-    output::info(&format!(
-        "Desktop file updated at: {}",
-        desktop_file_path.display()
-    ));
+    if !dry_run {
+        output::info(&format!(
+            "Desktop file updated at: {}",
+            desktop_file_path.display()
+        ));
+    }
 
     let final_name = entry.name.clone();
 
     // Persist manifest
     save_manifest(&manifest_path, &entries, dry_run)?;
-    output::info(&format!("Manifest updated at: {}", manifest_path.display()));
-
-    output::success(&format!("✓ {} updated successfully!", final_name));
+    if !dry_run {
+        output::info(&format!("Manifest updated at: {}", manifest_path.display()));
+        output::success(&format!("✓ {} updated successfully!", final_name));
+    }
     Ok(())
 }
 
@@ -191,12 +198,18 @@ pub fn update_all_apps(dry_run: bool) -> Result<(), Box<dyn Error>> {
     }
 
     for app in entries {
-        output::info(&format!("Updating {}...", app.name));
+        output::info(&format!(
+            "{} {}...",
+            if dry_run { "Previewing" } else { "Updating" },
+            app.name
+        ));
         if let Err(e) = update_app(&app.name, UpdateFlags::default(), dry_run) {
             output::error(&format!("Failed to update {}: {}", app.name, e));
         }
     }
 
-    output::success("All apps updated successfully!");
+    if !dry_run {
+        output::success("All apps updated successfully!");
+    }
     Ok(())
 }

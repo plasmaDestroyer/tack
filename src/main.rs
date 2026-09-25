@@ -201,7 +201,7 @@ fn print_usage() {
     eprintln!("       tack -i                           (interactive mode)");
     eprintln!("       tack list");
     eprintln!("       tack open <name>");
-    eprintln!("       tack remove <name>");
+    eprintln!("       tack remove <name> [--dry-run]");
     eprintln!(
         "       tack update <name> [--name NAME] [--url URL] [--browser BROWSER] [--icon PATH] [--dry-run]"
     );

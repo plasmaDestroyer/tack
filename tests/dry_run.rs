@@ -23,6 +23,18 @@ fn update_and_remove_dry_runs_preserve_app_files() {
             .unwrap()
     };
 
+    let preview = run(&[
+        "https://example.com",
+        "Preview",
+        "--icon",
+        icon.to_str().unwrap(),
+        "--browser",
+        "/bin/true",
+        "--dry-run",
+    ]);
+    assert!(preview.status.success());
+    assert!(!data.exists());
+
     assert!(
         run(&[
             "https://example.com",
@@ -43,11 +55,21 @@ fn update_and_remove_dry_runs_preserve_app_files() {
     let original_desktop = std::fs::read(&desktop).unwrap();
     let output = run(&["update", "Example", "--name", "Changed", "--dry-run"]);
     assert!(output.status.success());
+    assert!(!String::from_utf8_lossy(&output.stdout).contains("updated successfully"));
     assert_eq!(std::fs::read(&desktop).unwrap(), original_desktop);
+    assert_eq!(std::fs::read(&manifest).unwrap(), original_manifest);
+    assert!(run(&["update", "--all", "--dry-run"]).status.success());
+    assert_eq!(std::fs::read(&manifest).unwrap(), original_manifest);
+    assert!(
+        run(&["import", manifest.to_str().unwrap(), "--dry-run"])
+            .status
+            .success()
+    );
     assert_eq!(std::fs::read(&manifest).unwrap(), original_manifest);
 
     let output = run(&["remove", "Example", "--dry-run"]);
     assert!(output.status.success());
+    assert!(!String::from_utf8_lossy(&output.stdout).contains("removed successfully"));
     assert!(desktop.exists());
     assert!(icon.exists());
     assert_eq!(std::fs::read(&manifest).unwrap(), original_manifest);
