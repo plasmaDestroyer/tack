@@ -88,7 +88,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 output::error("Usage: tack open <name>");
                 std::process::exit(1);
             }
-            open_app(&args[2])?;
+            open_app(&args[2], dry_run)?;
         }
         "update" => {
             if args.len() < 3 {
@@ -105,11 +105,19 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
         "config" => {
-            handle_config(&args[2..])?;
+            handle_config(&args[2..], dry_run)?;
         }
         "export" => {
-            let output_path = args.get(2).map(|s| s.as_str());
-            export_apps(output_path)?;
+            let output_path = args[2..]
+                .iter()
+                .find(|arg| {
+                    !matches!(
+                        arg.as_str(),
+                        "--dry-run" | "--quiet" | "-q" | "--verbose" | "-v"
+                    )
+                })
+                .map(|s| s.as_str());
+            export_apps(output_path, dry_run)?;
         }
         "import" => {
             if args.len() < 3 {

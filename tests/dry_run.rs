@@ -17,6 +17,7 @@ fn update_and_remove_dry_runs_preserve_app_files() {
         Command::new(tack)
             .args(args)
             .env("XDG_DATA_HOME", &data)
+            .env("XDG_CONFIG_HOME", data.join("config"))
             .env("NO_COLOR", "1")
             .output()
             .unwrap()
@@ -50,6 +51,24 @@ fn update_and_remove_dry_runs_preserve_app_files() {
     assert!(desktop.exists());
     assert!(icon.exists());
     assert_eq!(std::fs::read(&manifest).unwrap(), original_manifest);
+
+    let backup = data.join("backup.json");
+    assert!(
+        run(&["export", backup.to_str().unwrap(), "--dry-run"])
+            .status
+            .success()
+    );
+    assert!(!backup.exists());
+    assert!(
+        run(&["config", "set", "browser", "chromium", "--dry-run"])
+            .status
+            .success()
+    );
+    assert!(!data.join("config/tack/config.toml").exists());
+    let open = run(&["open", "Example", "--dry-run"]);
+    assert!(open.status.success());
+    assert!(String::from_utf8_lossy(&open.stdout).contains("would open"));
+
     std::fs::remove_dir_all(data).unwrap();
 }
 

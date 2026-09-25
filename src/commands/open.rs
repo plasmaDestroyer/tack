@@ -6,7 +6,7 @@ use crate::manifest::{get_manifest_path, load_manifest};
 use crate::output;
 use crate::util::{get_share_dir, slugify};
 
-pub fn open_app(name: &str) -> Result<(), Box<dyn Error>> {
+pub fn open_app(name: &str, dry_run: bool) -> Result<(), Box<dyn Error>> {
     let share_dir = get_share_dir()?;
     let slug = slugify(name);
     let manifest_path = get_manifest_path(&share_dir);
@@ -16,6 +16,11 @@ pub fn open_app(name: &str) -> Result<(), Box<dyn Error>> {
         .iter()
         .find(|e| e.slug == slug)
         .ok_or_else(|| format!("App '{}' is not installed.", name))?;
+
+    if dry_run {
+        output::dry_run(&format!("would open {} with {}", entry.url, entry.browser));
+        return Ok(());
+    }
 
     output::info(&format!("Opening {} ({})", entry.name, entry.url));
 

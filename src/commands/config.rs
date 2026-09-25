@@ -3,7 +3,7 @@ use std::error::Error;
 use crate::config::{get_config_path, load_config};
 use crate::output;
 
-pub fn handle_config(args: &[String]) -> Result<(), Box<dyn Error>> {
+pub fn handle_config(args: &[String], dry_run: bool) -> Result<(), Box<dyn Error>> {
     if args.is_empty() {
         output::error("Usage: tack config show");
         output::error("       tack config set <key> <value>");
@@ -17,7 +17,7 @@ pub fn handle_config(args: &[String]) -> Result<(), Box<dyn Error>> {
                 output::error("Usage: tack config set <key> <value>");
                 std::process::exit(1);
             }
-            set_config(&args[1], &args[2])
+            set_config(&args[1], &args[2], dry_run)
         }
         _ => {
             output::error(&format!("Unknown config command: {}", args[0]));
@@ -40,8 +40,12 @@ fn show_config() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn set_config(key: &str, value: &str) -> Result<(), Box<dyn Error>> {
+fn set_config(key: &str, value: &str, dry_run: bool) -> Result<(), Box<dyn Error>> {
     let config_path = get_config_path();
+    if dry_run {
+        output::dry_run(&format!("would set {} in {}", key, config_path.display()));
+        return Ok(());
+    }
 
     // Read existing file
     let mut lines = Vec::new();
