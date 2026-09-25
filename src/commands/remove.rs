@@ -6,7 +6,7 @@ use crate::manifest::{get_manifest_path, load_manifest, save_manifest};
 use crate::output;
 use crate::util::{get_share_dir, slugify};
 
-pub fn remove_app(name: &str) -> Result<(), Box<dyn Error>> {
+pub fn remove_app(name: &str, dry_run: bool) -> Result<(), Box<dyn Error>> {
     let share_dir = get_share_dir()?;
     let slug = slugify(name);
     let manifest_path = get_manifest_path(&share_dir);
@@ -25,11 +25,15 @@ pub fn remove_app(name: &str) -> Result<(), Box<dyn Error>> {
     // Delete .desktop file
     let desktop_file_path = get_desktop_file_path(&slug, &share_dir);
     if desktop_file_path.exists() {
-        std::fs::remove_file(&desktop_file_path)?;
-        output::info(&format!(
-            "Removed desktop file: {}",
-            desktop_file_path.display()
-        ));
+        if dry_run {
+            output::dry_run(&format!("would remove: {}", desktop_file_path.display()));
+        } else {
+            std::fs::remove_file(&desktop_file_path)?;
+            output::info(&format!(
+                "Removed desktop file: {}",
+                desktop_file_path.display()
+            ));
+        }
     }
 
     // Delete icon only if it lives inside share_dir/icons/ (i.e. managed by tack)
@@ -37,15 +41,21 @@ pub fn remove_app(name: &str) -> Result<(), Box<dyn Error>> {
     let icon_path = Path::new(&entry.icon_path);
     if icon_path.exists() {
         if icon_path.starts_with(&icons_dir) {
-            std::fs::remove_file(icon_path)?;
-            output::info(&format!("Removed icon: {}", entry.icon_path));
+            if dry_run {
+                output::dry_run(&format!("would remove: {}", entry.icon_path));
+            } else {
+                std::fs::remove_file(icon_path)?;
+                output::info(&format!("Removed icon: {}", entry.icon_path));
+            }
         } else {
             output::info(&format!("Skipping user-supplied icon: {}", entry.icon_path));
         }
     }
 
-    // Save updated manifest (never dry-run for remove)
-    save_manifest(&manifest_path, &entries, false)?;
+    save_manifest(&manifest_path, &entries, dry_run)?;
+    if dry_run {
+        return Ok(());
+    }
     output::info("Manifest updated.");
 
     output::success(&format!("✓ {} removed successfully!", name));

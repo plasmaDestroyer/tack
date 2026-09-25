@@ -81,7 +81,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 output::error("Usage: tack remove <name>");
                 std::process::exit(1);
             }
-            remove_app(&args[2])?;
+            remove_app(&args[2], dry_run)?;
         }
         "open" => {
             if args.len() < 3 {
