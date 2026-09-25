@@ -249,8 +249,7 @@ fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
     // 2. Browser (numbered list of detected browsers)
     let browsers = detect_browsers();
     let browser = if browsers.is_empty() {
-        output::warn("No browsers detected on PATH. Falling back to 'chromium'.");
-        None
+        return Err("No supported browser found on PATH. Install a Chromium-based browser.".into());
     } else {
         output::info("\nAvailable browsers:");
         for (i, b) in browsers.iter().enumerate() {

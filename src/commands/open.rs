@@ -4,7 +4,7 @@ use std::process::Stdio;
 
 use crate::manifest::{get_manifest_path, load_manifest};
 use crate::output;
-use crate::util::{get_share_dir, slugify};
+use crate::util::{get_share_dir, slugify, validate_app_browser};
 
 pub fn open_app(name: &str, dry_run: bool) -> Result<(), Box<dyn Error>> {
     let share_dir = get_share_dir()?;
@@ -16,6 +16,7 @@ pub fn open_app(name: &str, dry_run: bool) -> Result<(), Box<dyn Error>> {
         .iter()
         .find(|e| e.slug == slug)
         .ok_or_else(|| format!("App '{}' is not installed.", name))?;
+    validate_app_browser(&entry.browser)?;
 
     if dry_run {
         output::dry_run(&format!("would open {} with {}", entry.url, entry.browser));

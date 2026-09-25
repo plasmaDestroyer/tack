@@ -5,7 +5,9 @@ use crate::desktop::{create_desktop_file, get_desktop_file_path};
 use crate::icon::{DEFAULT_ICON, ImageFormat, detect_format, fetch_favicon, save_icon};
 use crate::manifest::{get_manifest_path, load_manifest, save_manifest};
 use crate::output;
-use crate::util::{check_online, get_share_dir, normalize_url, slugify, validate_url};
+use crate::util::{
+    check_online, get_share_dir, normalize_url, slugify, validate_app_browser, validate_url,
+};
 
 #[derive(Default)]
 pub struct UpdateFlags {
@@ -102,6 +104,7 @@ pub fn update_app(
     if let Some(new_name) = &flags.name {
         entry.name = new_name.clone();
     }
+    validate_app_browser(&entry.browser)?;
 
     // Handle icon: explicit --icon flag, or repair-mode re-fetch
     if let Some(icon_arg) = &flags.icon {

@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
-use crate::output;
+use crate::{output, util::validate_app_browser};
 
 fn desktop_value(value: &str) -> String {
     value
@@ -38,23 +38,16 @@ pub fn create_desktop_file(
     desktop_file_path: &Path,
     dry_run: bool,
 ) -> Result<(), Box<dyn Error>> {
+    validate_app_browser(browser)?;
     let applications_dir = &desktop_file_path
         .parent()
         .ok_or("Invalid desktop file path")?;
 
-    let exec_args = if browser == "firefox"
-        || browser == "zen-browser"
-        || browser.contains("firefox")
-        || browser.contains("zen")
-    {
-        format!("{} --ssb {}", exec_arg(browser), exec_arg(url))
-    } else {
-        format!(
-            "{} {}",
-            exec_arg(browser),
-            exec_arg(&format!("--app={url}"))
-        )
-    };
+    let exec_args = format!(
+        "{} {}",
+        exec_arg(browser),
+        exec_arg(&format!("--app={url}"))
+    );
 
     let categories_str = categories.unwrap_or("Network").trim_end_matches(';');
     let categories_str = if categories_str.is_empty() {

@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::net::{SocketAddr, TcpStream};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 pub fn get_share_dir() -> Result<PathBuf, Box<dyn Error>> {
@@ -93,9 +93,22 @@ const KNOWN_BROWSERS: &[&str] = &[
     "ungoogled-chromium",
     "vivaldi",
     "microsoft-edge-stable",
-    "zen-browser",
-    "firefox",
 ];
+
+pub fn validate_app_browser(browser: &str) -> Result<(), String> {
+    let name = Path::new(browser)
+        .file_name()
+        .and_then(|name| name.to_str());
+    if name.is_some_and(|name| {
+        name.starts_with("firefox") || name == "zen" || name.starts_with("zen-browser")
+    }) {
+        return Err(format!(
+            "Browser '{}' cannot open standalone app windows on Linux. Use a Chromium-based browser.",
+            browser
+        ));
+    }
+    Ok(())
+}
 
 pub fn detect_browser() -> Option<String> {
     detect_browsers().into_iter().next()
