@@ -6,7 +6,7 @@
 
 `tack` takes a website URL and a name, and automatically sets up a desktop application for it. It features a robust icon fetching pipeline: it first checks your local icon cache, then tries to fetch high-quality SVG logos from `svgl.app`, scrapes the website's HTML for `<link>` tags (like `apple-touch-icon`), and finally falls back to `/favicon.ico` or the Google Favicons API. It supports `.png`, `.svg`, and even legacy `.ico` formats (which it natively converts to `.png`). It then generates a `.desktop` file that launches the website using your browser in a standalone app window. All installed applications are tracked in a metadata manifest.
 
-It can auto-detect installed browsers by scanning your `PATH` and handles specific command line flags automatically (like `--app=` for Chromium-based or `--ssb` for Firefox-based browsers).
+It auto-detects Chromium-based browsers on your `PATH` and opens sites with the `--app=` flag. Firefox and Zen do not support standalone app windows on Linux.
 
 ## Usage
 
@@ -46,7 +46,7 @@ tack https://youtube.com YouTube --icon /path/to/my-icon.png
 To specify a browser explicitly instead of relying on auto-detection:
 
 ```bash
-tack https://youtube.com YouTube --browser firefox
+tack https://youtube.com YouTube --browser brave-browser
 ```
 
 ### Interactive Mode
@@ -176,7 +176,7 @@ tack manpage | sudo tee /usr/local/share/man/man1/tack.1  # install
 
 - **Auto icon fetching** — svgl.app → HTML `<link>` tags → `/favicon.ico` → Google Favicons API
 - **ICO to PNG conversion** — native, no external tools
-- **Browser auto-detection** — scans `PATH` for Chromium/Firefox-based browsers
+- **Browser auto-detection** — scans `PATH` for Chromium-based browsers
 - **Colored output** — green/yellow/red ANSI colors, respects `NO_COLOR`
 - **URL validation** — catches malformed URLs before any work is done
 - **Offline detection** — fast TCP check before attempting network requests
@@ -191,7 +191,7 @@ tack manpage | sudo tee /usr/local/share/man/man1/tack.1  # install
 ## Requirements
 
 - Linux
-- A supported browser (Chromium-based or Firefox-based) installed on your system
+- A Chromium-based browser installed on your system
 - Rust and Cargo (for building from source)
 
 ## Installation
