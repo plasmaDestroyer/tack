@@ -208,7 +208,8 @@ pub fn update_all_apps(dry_run: bool) -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    for app in entries {
+    let mut failed = 0;
+    for app in &entries {
         output::info(&format!(
             "{} {}...",
             if dry_run { "Previewing" } else { "Updating" },
@@ -216,9 +217,13 @@ pub fn update_all_apps(dry_run: bool) -> Result<(), Box<dyn Error>> {
         ));
         if let Err(e) = update_app(&app.name, UpdateFlags::default(), dry_run) {
             output::error(&format!("Failed to update {}: {}", app.name, e));
+            failed += 1;
         }
     }
 
+    if failed > 0 {
+        return Err(format!("{} of {} apps failed to update.", failed, entries.len()).into());
+    }
     if !dry_run {
         output::success("All apps updated successfully!");
     }
