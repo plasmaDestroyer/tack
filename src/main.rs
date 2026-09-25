@@ -14,7 +14,7 @@ use commands::completions::{generate_completions, generate_manpage};
 use commands::config::handle_config;
 use commands::export::export_apps;
 use commands::import::import_apps;
-use commands::install::install_app;
+use commands::install::{IconSource, install_app};
 use commands::list::list_apps;
 use commands::open::open_app;
 use commands::remove::remove_app;
@@ -175,7 +175,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 positional[0],
                 positional[1],
                 force,
-                icon_path,
+                icon_path.map(IconSource::File),
                 browser,
                 dry_run,
             )?;
@@ -285,42 +285,34 @@ fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
     // Wait for the background fetch to finish
     let fetched = rx.recv().unwrap_or(None);
 
-    // Save the fetched icon to a temp directory so we can preview it immediately.
-    // Kept around for now — cleaned up later when we add temp management.
-    let preview_path = match &fetched {
+    // Preview uses a temporary file only during a real install.
+    match &fetched {
         Some((bytes, format)) => {
-            let ext = match format {
-                icon::ImageFormat::Png => "png",
-                icon::ImageFormat::Svg => "svg",
-                icon::ImageFormat::Ico => "png",
-            };
-            let tmp_dir =
-                std::env::temp_dir().join(format!("tack_{}", std::process::id()));
-            let path = tmp_dir.join(format!("icon.{}", ext));
-            let out = if matches!(format, icon::ImageFormat::Ico) {
-                ico::ico_to_png(bytes).unwrap_or_else(|_| bytes.clone())
-            } else {
-                bytes.clone()
-            };
-            if std::fs::create_dir_all(&tmp_dir).is_ok()
-                && std::fs::write(&path, &out).is_ok()
-            {
-                output::success(&format!("Icon fetched: {:?}", format));
-                preview_icon(&path);
-                Some(path)
-            } else {
-                None
+            output::success(&format!("Icon fetched: {:?}", format));
+            if !dry_run && !matches!(format, icon::ImageFormat::Svg) {
+                let tmp_dir = std::env::temp_dir().join(format!("tack_{}", std::process::id()));
+                let path = tmp_dir.join("icon.png");
+                let out = if matches!(format, icon::ImageFormat::Ico) {
+                    ico::ico_to_png(bytes).unwrap_or_else(|_| bytes.clone())
+                } else {
+                    bytes.clone()
+                };
+                if std::fs::create_dir_all(&tmp_dir).is_ok() && std::fs::write(&path, &out).is_ok()
+                {
+                    preview_icon(&path);
+                    let _ = std::fs::remove_file(&path);
+                    let _ = std::fs::remove_dir(&tmp_dir);
+                }
             }
         }
         _ => {
             output::warn("Could not fetch an icon — will use default or custom.");
-            None
         }
-    };
+    }
 
     // 4. Icon — verify the fetched one against custom/default
     output::info("\nIcon source:");
-    let fetched_num = if preview_path.is_some() { Some(1) } else { None };
+    let fetched_num = if fetched.is_some() { Some(1) } else { None };
     let custom_num = fetched_num.map(|n| n + 1).unwrap_or(1);
     let default_num = custom_num + 1;
     if let Some(n) = fetched_num {
@@ -330,27 +322,24 @@ fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
     output::info(&format!("  [{}] Use default icon", default_num));
     let icon_choice = prompt("Pick an option");
 
-    let icon_arg = if fetched_num.is_some() && icon_choice.trim().is_empty() {
-        // Enter = default = fetched icon
-        preview_path.as_ref().map(|p| p.display().to_string())
-    } else if icon_choice.trim() == custom_num.to_string() {
-        let path = prompt("Enter the icon file path");
-        if path.is_empty() {
-            output::error("Icon path cannot be empty.");
-            std::process::exit(1);
-        }
-        let path_buf = std::path::PathBuf::from(&path);
-        if !path_buf.exists() {
-            output::error(&format!("Icon file not found: {}", path));
-            std::process::exit(1);
-        }
-        Some(path)
-    } else {
-        let default_path = share_dir.join("icons").join("_default_tack.png");
-        std::fs::create_dir_all(default_path.parent().unwrap())?;
-        std::fs::write(&default_path, icon::DEFAULT_ICON)?;
-        Some(default_path.display().to_string())
-    };
+    let icon_arg =
+        if fetched_num.is_some() && (icon_choice.trim().is_empty() || icon_choice.trim() == "1") {
+            fetched.map(|(bytes, format)| IconSource::Fetched(bytes, format))
+        } else if icon_choice.trim() == custom_num.to_string() {
+            let path = prompt("Enter the icon file path");
+            if path.is_empty() {
+                output::error("Icon path cannot be empty.");
+                std::process::exit(1);
+            }
+            let path_buf = std::path::PathBuf::from(&path);
+            if !path_buf.exists() {
+                output::error(&format!("Icon file not found: {}", path));
+                std::process::exit(1);
+            }
+            Some(IconSource::File(path))
+        } else {
+            Some(IconSource::Default)
+        };
 
     output::info(""); // blank line before install output
     install_app(&url, &name, false, icon_arg, browser, dry_run)

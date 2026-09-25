@@ -10,11 +10,17 @@ use crate::util::{
     validate_url,
 };
 
+pub enum IconSource {
+    File(String),
+    Fetched(Vec<u8>, ImageFormat),
+    Default,
+}
+
 pub fn install_app(
     url: &str,
     name: &str,
     force: bool,
-    icon_arg: Option<String>,
+    icon_arg: Option<IconSource>,
     browser_arg: Option<String>,
     dry_run: bool,
 ) -> Result<(), Box<dyn Error>> {
@@ -42,54 +48,65 @@ pub fn install_app(
 
     let mut user_supplied_icon = false;
 
-    let icon_path = if let Some(icon_path_str) = icon_arg {
-        let icon_path_buf = std::path::PathBuf::from(&icon_path_str);
-        if icon_path_buf.exists() {
-            output::info(&format!("Using custom icon: {}", icon_path_str));
-            let bytes = std::fs::read(&icon_path_buf)?;
-            let format = detect_format(&bytes)
-                .ok_or("Unsupported icon format (expected PNG, SVG, or ICO)")?;
-            output::verbose(&format!("Detected icon format: {:?}", format_name(&format)));
-            user_supplied_icon = true;
-            save_icon(&slug, &bytes, format, &share_dir, dry_run)?
-        } else {
-            output::error(&format!("Icon file not found: {}", icon_path_str));
-            std::process::exit(1);
-        }
-    } else {
-        let icons_dir = share_dir.join("icons");
-        let cached_png = icons_dir.join(format!("{}.png", slug));
-        let cached_svg = icons_dir.join(format!("{}.svg", slug));
-
-        if cached_png.exists() {
-            output::info(&format!("Found cached icon: {}", cached_png.display()));
-            cached_png
-        } else if cached_svg.exists() {
-            output::info(&format!("Found cached icon: {}", cached_svg.display()));
-            cached_svg
-        } else {
-            // Offline check before network fetch (#24)
-            if !check_online() {
-                output::error("No network connection. Use --icon to install with a custom icon.");
+    let icon_path = match icon_arg {
+        Some(IconSource::File(icon_path_str)) => {
+            let icon_path_buf = std::path::PathBuf::from(&icon_path_str);
+            if icon_path_buf.exists() {
+                output::info(&format!("Using custom icon: {}", icon_path_str));
+                let bytes = std::fs::read(&icon_path_buf)?;
+                let format = detect_format(&bytes)
+                    .ok_or("Unsupported icon format (expected PNG, SVG, or ICO)")?;
+                output::verbose(&format!("Detected icon format: {:?}", format_name(&format)));
+                user_supplied_icon = true;
+                save_icon(&slug, &bytes, format, &share_dir, dry_run)?
+            } else {
+                output::error(&format!("Icon file not found: {}", icon_path_str));
                 std::process::exit(1);
             }
+        }
+        Some(IconSource::Fetched(bytes, format)) => {
+            save_icon(&slug, &bytes, format, &share_dir, dry_run)?
+        }
+        Some(IconSource::Default) => {
+            save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir, dry_run)?
+        }
+        None => {
+            let icons_dir = share_dir.join("icons");
+            let cached_png = icons_dir.join(format!("{}.png", slug));
+            let cached_svg = icons_dir.join(format!("{}.svg", slug));
 
-            output::info(&format!("Fetching favicon for {}...", url));
-            if let Some(bytes) = fetch_favicon(&url) {
-                if let Some(icon_format) = detect_format(&bytes) {
-                    output::verbose(&format!(
-                        "Favicon fetched — format: {}",
-                        format_name(&icon_format)
-                    ));
-                    output::success("Favicon fetched successfully!");
-                    save_icon(&slug, &bytes, icon_format, &share_dir, dry_run)?
+            if cached_png.exists() {
+                output::info(&format!("Found cached icon: {}", cached_png.display()));
+                cached_png
+            } else if cached_svg.exists() {
+                output::info(&format!("Found cached icon: {}", cached_svg.display()));
+                cached_svg
+            } else {
+                // Offline check before network fetch (#24)
+                if !check_online() {
+                    output::error(
+                        "No network connection. Use --icon to install with a custom icon.",
+                    );
+                    std::process::exit(1);
+                }
+
+                output::info(&format!("Fetching favicon for {}...", url));
+                if let Some(bytes) = fetch_favicon(&url) {
+                    if let Some(icon_format) = detect_format(&bytes) {
+                        output::verbose(&format!(
+                            "Favicon fetched — format: {}",
+                            format_name(&icon_format)
+                        ));
+                        output::success("Favicon fetched successfully!");
+                        save_icon(&slug, &bytes, icon_format, &share_dir, dry_run)?
+                    } else {
+                        output::warn("Wrong image format — installing with default icon.");
+                        save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir, dry_run)?
+                    }
                 } else {
-                    output::warn("Wrong image format — installing with default icon.");
+                    output::warn("Favicon not found — installing with default icon.");
                     save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir, dry_run)?
                 }
-            } else {
-                output::warn("Favicon not found — installing with default icon.");
-                save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir, dry_run)?
             }
         }
     };
