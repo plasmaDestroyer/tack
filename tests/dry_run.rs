@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 #[test]
-fn remove_dry_run_preserves_app_files() {
+fn update_and_remove_dry_runs_preserve_app_files() {
     let data = std::env::temp_dir().join(format!(
         "tack-dry-run-{}-{}",
         std::process::id(),
@@ -39,6 +39,12 @@ fn remove_dry_run_preserves_app_files() {
     let icon = data.join("icons/example.png");
     let manifest = data.join("tack/apps.json");
     let original_manifest = std::fs::read(&manifest).unwrap();
+    let original_desktop = std::fs::read(&desktop).unwrap();
+    let output = run(&["update", "Example", "--name", "Changed", "--dry-run"]);
+    assert!(output.status.success());
+    assert_eq!(std::fs::read(&desktop).unwrap(), original_desktop);
+    assert_eq!(std::fs::read(&manifest).unwrap(), original_manifest);
+
     let output = run(&["remove", "Example", "--dry-run"]);
     assert!(output.status.success());
     assert!(desktop.exists());

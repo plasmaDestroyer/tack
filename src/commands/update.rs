@@ -20,6 +20,7 @@ pub fn parse_update_flags(args: &[String]) -> Result<UpdateFlags, Box<dyn Error>
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
+            "--dry-run" | "--quiet" | "-q" | "--verbose" | "-v" => i += 1,
             "--icon" => {
                 let val = args.get(i + 1).ok_or("--icon requires a value")?;
                 flags.icon = Some(val.clone());
