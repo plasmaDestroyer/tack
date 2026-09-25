@@ -14,6 +14,8 @@ pub fn import_apps(input_path: &str, dry_run: bool) -> Result<(), Box<dyn Error>
         return Ok(());
     }
 
+    let total = entries.len();
+    let mut failed = 0;
     for app in entries {
         output::info(&format!(
             "{} {}...",
@@ -23,9 +25,13 @@ pub fn import_apps(input_path: &str, dry_run: bool) -> Result<(), Box<dyn Error>
         // Force install to recreate desktop files and re-fetch icons
         if let Err(e) = install_app(&app.url, &app.name, true, None, Some(app.browser), dry_run) {
             output::error(&format!("Failed to import {}: {}", app.name, e));
+            failed += 1;
         }
     }
 
+    if failed > 0 {
+        return Err(format!("{} of {} apps failed to import.", failed, total).into());
+    }
     if !dry_run {
         output::success("Import completed successfully!");
     }
