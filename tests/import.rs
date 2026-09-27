@@ -19,7 +19,8 @@ fn import_reports_partial_failure() {
     .unwrap();
     let backup = root.join("backup.json");
     let entries = serde_json::json!([
-        {"name":"Bad","slug":"bad","url":"https://example.com","browser":"firefox","icon_path":"","installed_at":0},
+        {"name":"Bad URL","slug":"bad-url","url":"https://invalid","browser":"/bin/true","icon_path":"","installed_at":0},
+        {"name":"Bad Browser","slug":"bad-browser","url":"https://example.com","browser":"/nonexistent/tack-browser","icon_path":"","installed_at":0},
         {"name":"Good","slug":"good","url":"https://example.com","browser":"/bin/true","icon_path":"","installed_at":0}
     ]);
     std::fs::write(&backup, serde_json::to_vec(&entries).unwrap()).unwrap();
@@ -33,11 +34,13 @@ fn import_reports_partial_failure() {
         .unwrap();
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("Failed to import Bad"));
-    assert!(stderr.contains("1 of 2 apps failed to import"));
+    assert!(stderr.contains("Failed to import Bad URL"));
+    assert!(stderr.contains("Failed to import Bad Browser"));
+    assert!(stderr.contains("2 of 3 apps failed to import"));
     assert!(!String::from_utf8_lossy(&output.stdout).contains("Import completed successfully"));
     assert!(root.join("data/applications/good.desktop").exists());
-    assert!(!root.join("data/applications/bad.desktop").exists());
+    assert!(!root.join("data/applications/bad-url.desktop").exists());
+    assert!(!root.join("data/applications/bad-browser.desktop").exists());
 
     std::fs::remove_dir_all(root).unwrap();
 }

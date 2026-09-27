@@ -29,21 +29,18 @@ pub fn install_app(
     let url = normalize_url(url);
 
     // Validate URL early (#23)
-    if let Err(msg) = validate_url(&url) {
-        output::error(&msg);
-        std::process::exit(1);
-    }
+    validate_url(&url)?;
 
     let share_dir = get_share_dir()?;
     let slug = slugify(name);
 
     let desktop_file_path = get_desktop_file_path(&slug, &share_dir);
     if !force && desktop_file_path.exists() {
-        output::error(&format!(
+        return Err(format!(
             "{} is already installed. Use `tack update {}` to modify it.",
             name, name
-        ));
-        std::process::exit(1);
+        )
+        .into());
     }
     let manifest_path = get_manifest_path(&share_dir);
     let entries = load_manifest(&manifest_path)?;
@@ -77,11 +74,11 @@ pub fn install_app(
                 resolved
             }
             None => {
-                output::error(&format!(
+                return Err(format!(
                     "Browser '{}' not found on PATH. Check the name with `which {}`.",
                     browser_name, browser_name
-                ));
-                std::process::exit(1);
+                )
+                .into());
             }
         }
     } else {
@@ -104,8 +101,7 @@ pub fn install_app(
                 user_supplied_icon = true;
                 save_icon(&slug, &bytes, format, &share_dir, dry_run)?
             } else {
-                output::error(&format!("Icon file not found: {}", icon_path_str));
-                std::process::exit(1);
+                return Err(format!("Icon file not found: {}", icon_path_str).into());
             }
         }
         Some(IconSource::Fetched(bytes, format)) => {
@@ -128,10 +124,9 @@ pub fn install_app(
             } else {
                 // Offline check before network fetch (#24)
                 if !check_online() {
-                    output::error(
-                        "No network connection. Use --icon to install with a custom icon.",
+                    return Err(
+                        "No network connection. Use --icon to install with a custom icon.".into(),
                     );
-                    std::process::exit(1);
                 }
 
                 output::info(&format!("Fetching favicon for {}...", url));
