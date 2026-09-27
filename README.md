@@ -179,7 +179,7 @@ tack manpage | sudo tee /usr/local/share/man/man1/tack.1  # install
 - **Browser auto-detection** — scans `PATH` for Chromium-based browsers
 - **Colored output** — green/yellow/red ANSI colors, respects `NO_COLOR`
 - **URL validation** — catches malformed URLs before any work is done
-- **Offline detection** — fast TCP check before attempting network requests
+- **Bounded icon fetches** — short request timeouts; falls back to the default icon if fetching fails
 - **Interactive mode** (`-i`) — guided step-by-step setup
 - **Dry run** (`--dry-run`) — preview changes without touching the filesystem
 - **Quiet/Verbose** (`--quiet`, `--verbose`) — control output verbosity

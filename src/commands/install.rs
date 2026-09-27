@@ -8,8 +8,8 @@ use crate::manifest::{
 };
 use crate::output;
 use crate::util::{
-    check_online, detect_browser, get_share_dir, normalize_url, resolve_browser, slugify,
-    validate_app_browser, validate_url,
+    detect_browser, get_share_dir, normalize_url, resolve_browser, slugify, validate_app_browser,
+    validate_url,
 };
 
 pub enum IconSource {
@@ -122,13 +122,6 @@ pub fn install_app(
                 output::info(&format!("Found cached icon: {}", cached_svg.display()));
                 cached_svg
             } else {
-                // Offline check before network fetch (#24)
-                if !check_online() {
-                    return Err(
-                        "No network connection. Use --icon to install with a custom icon.".into(),
-                    );
-                }
-
                 output::info(&format!("Fetching favicon for {}...", url));
                 if let Some(bytes) = fetch_favicon(&url) {
                     if let Some(icon_format) = detect_format(&bytes) {

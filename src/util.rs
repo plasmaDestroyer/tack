@@ -1,7 +1,5 @@
 use std::error::Error;
-use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
 pub fn get_share_dir() -> Result<PathBuf, Box<dyn Error>> {
     if let Ok(home_directory) = std::env::var("XDG_DATA_HOME") {
@@ -74,13 +72,6 @@ pub fn validate_url(url: &str) -> Result<(), String> {
     }
 
     Ok(())
-}
-
-/// Quick network connectivity check via TCP to Google DNS.
-/// Returns true if online.
-pub fn check_online() -> bool {
-    let addr: SocketAddr = "8.8.8.8:53".parse().unwrap();
-    TcpStream::connect_timeout(&addr, Duration::from_secs(2)).is_ok()
 }
 
 const KNOWN_BROWSERS: &[&str] = &[

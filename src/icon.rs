@@ -1,5 +1,8 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
+
+use reqwest::blocking::Client;
 
 use crate::ico;
 use crate::output;
@@ -70,11 +73,11 @@ fn find_icon_in_html(html: &str) -> Option<String> {
     best_href
 }
 
-pub fn fetch_svgl_icon(url: &str) -> Option<Vec<u8>> {
+fn fetch_svgl_icon(url: &str, client: &Client) -> Option<Vec<u8>> {
     let parsed_target = reqwest::Url::parse(url).ok()?;
     let target_host = parsed_target.host_str()?.replace("www.", "");
 
-    let response = reqwest::blocking::get("https://api.svgl.app").ok()?;
+    let response = client.get("https://api.svgl.app").send().ok()?;
     if !response.status().is_success() {
         return None;
     }
@@ -102,7 +105,7 @@ pub fn fetch_svgl_icon(url: &str) -> Option<Vec<u8>> {
                 };
 
                 if let Some(dl_url) = svg_url
-                    && let Ok(r) = reqwest::blocking::get(dl_url)
+                    && let Ok(r) = client.get(dl_url).send()
                     && r.status().is_success()
                     && let Ok(bytes) = r.bytes()
                 {
@@ -115,21 +118,26 @@ pub fn fetch_svgl_icon(url: &str) -> Option<Vec<u8>> {
 }
 
 pub fn fetch_favicon(url: &str) -> Option<Vec<u8>> {
+    let client = Client::builder()
+        .timeout(Duration::from_secs(3))
+        .build()
+        .ok()?;
+
     // 0. Try fetching from svgl.app first
-    if let Some(svgl_bytes) = fetch_svgl_icon(url) {
+    if let Some(svgl_bytes) = fetch_svgl_icon(url, &client) {
         return Some(svgl_bytes);
     }
 
     let parsed_url = reqwest::Url::parse(url).ok()?;
 
     // 1. Try fetching the HTML to find icon tags
-    if let Ok(response) = reqwest::blocking::get(url)
+    if let Ok(response) = client.get(url).send()
         && response.status().is_success()
         && let Ok(html) = response.text()
         && let Some(href) = find_icon_in_html(&html)
         && let Ok(icon_url) = parsed_url.join(&href)
     {
-        let icon_response = reqwest::blocking::get(icon_url).ok();
+        let icon_response = client.get(icon_url).send().ok();
         if let Some(r) = icon_response
             && r.status().is_success()
             && let Ok(bytes) = r.bytes()
@@ -140,7 +148,9 @@ pub fn fetch_favicon(url: &str) -> Option<Vec<u8>> {
 
     // 2. Fallback to /favicon.ico directly
     if let Ok(favicon_url) = parsed_url.join("/favicon.ico") {
-        let direct_bytes = reqwest::blocking::get(favicon_url.clone())
+        let direct_bytes = client
+            .get(favicon_url)
+            .send()
             .ok()
             .and_then(|r| {
                 if r.status().is_success() {
@@ -159,7 +169,9 @@ pub fn fetch_favicon(url: &str) -> Option<Vec<u8>> {
     // 3. Fallback to Google Favicon API
     if let Some(host) = parsed_url.host_str() {
         let google_api_url = format!("https://www.google.com/s2/favicons?domain={}&sz=128", host);
-        let google_bytes = reqwest::blocking::get(&google_api_url)
+        let google_bytes = client
+            .get(&google_api_url)
+            .send()
             .ok()
             .and_then(|r| {
                 if r.status().is_success() {

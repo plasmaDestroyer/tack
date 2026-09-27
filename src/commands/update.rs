@@ -5,9 +5,7 @@ use crate::desktop::{create_desktop_file, get_desktop_file_path};
 use crate::icon::{DEFAULT_ICON, ImageFormat, detect_format, fetch_favicon, save_icon};
 use crate::manifest::{find_app_index, get_manifest_path, load_manifest, save_manifest};
 use crate::output;
-use crate::util::{
-    check_online, get_share_dir, normalize_url, slugify, validate_app_browser, validate_url,
-};
+use crate::util::{get_share_dir, normalize_url, slugify, validate_app_browser, validate_url};
 
 #[derive(Default)]
 pub struct UpdateFlags {
@@ -141,12 +139,6 @@ pub fn update_app(
                 "Repair mode: re-fetching favicon for {}...",
                 entry.url
             ));
-
-            // Offline check (#24)
-            if !check_online() {
-                output::error("No network connection. Use --icon to update with a custom icon.");
-                std::process::exit(1);
-            }
 
             let icon_path = if let Some(bytes) = fetch_favicon(&entry.url) {
                 if let Some(icon_format) = detect_format(&bytes) {

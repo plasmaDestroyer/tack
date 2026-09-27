@@ -21,7 +21,7 @@ use commands::remove::remove_app;
 use commands::update::{parse_update_flags, update_all_apps, update_app};
 use desktop::get_desktop_file_path;
 use output::OutputMode;
-use util::{check_online, detect_browsers, get_share_dir, normalize_url, slugify, validate_url};
+use util::{detect_browsers, get_share_dir, normalize_url, slugify, validate_url};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().collect();
@@ -354,10 +354,6 @@ fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
 
 /// Fetch the favicon off the main thread. Returns (bytes, format) on success.
 fn fetch_favicon_async(url: &str) -> Option<(Vec<u8>, icon::ImageFormat)> {
-    if !check_online() {
-        output::warn("No network connection.");
-        return None;
-    }
     let bytes = icon::fetch_favicon(url)?;
     let format = icon::detect_format(&bytes)?;
     Some((bytes, format))
