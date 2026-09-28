@@ -221,6 +221,32 @@ pub fn save_icon(
     Ok(icon_path)
 }
 
+pub fn remove_replaced_icon(
+    old_icon: &str,
+    new_icon: &Path,
+    slug: &str,
+    share_dir: &Path,
+    dry_run: bool,
+) {
+    let old = Path::new(old_icon);
+    let icons_dir = share_dir.join("icons");
+    if old == new_icon
+        || !old.exists()
+        || (old != icons_dir.join(format!("{slug}.png"))
+            && old != icons_dir.join(format!("{slug}.svg")))
+    {
+        return;
+    }
+    if dry_run {
+        output::dry_run(&format!("would remove old icon: {}", old.display()));
+    } else if let Err(error) = std::fs::remove_file(old) {
+        output::warn(&format!(
+            "Could not remove old icon {}: {error}",
+            old.display()
+        ));
+    }
+}
+
 pub fn detect_format(bytes: &[u8]) -> Option<ImageFormat> {
     if bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
         Some(ImageFormat::Png)

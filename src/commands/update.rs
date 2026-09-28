@@ -2,7 +2,9 @@ use std::error::Error;
 use std::path::PathBuf;
 
 use crate::desktop::{create_desktop_file, get_desktop_file_path};
-use crate::icon::{DEFAULT_ICON, ImageFormat, detect_format, fetch_favicon, save_icon};
+use crate::icon::{
+    DEFAULT_ICON, ImageFormat, detect_format, fetch_favicon, remove_replaced_icon, save_icon,
+};
 use crate::manifest::{find_app_index, get_manifest_path, load_manifest, save_manifest};
 use crate::output;
 use crate::util::{get_share_dir, normalize_url, slugify, validate_app_browser, validate_url};
@@ -71,6 +73,7 @@ pub fn update_app(
     }
     let entry = &mut entries[index];
     let slug = entry.slug.clone();
+    let old_icon = entry.icon_path.clone();
 
     let has_overrides = flags.icon.is_some()
         || flags.url.is_some()
@@ -183,6 +186,7 @@ pub fn update_app(
 
     // Persist manifest
     save_manifest(&manifest_path, &entries, dry_run)?;
+    remove_replaced_icon(&old_icon, &icon_path, &slug, &share_dir, dry_run);
     if !dry_run {
         output::info(&format!("Manifest updated at: {}", manifest_path.display()));
         output::success(&format!("✓ {} updated successfully!", final_name));
