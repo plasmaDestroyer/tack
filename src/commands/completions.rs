@@ -37,7 +37,7 @@ pub fn build_cli() -> Command {
             Arg::new("browser")
                 .long("browser")
                 .value_name("BROWSER")
-                .help("Browser to use (e.g. chromium, firefox)"),
+                .help("Browser to use (e.g. chromium, brave-browser)"),
         )
         .arg(
             Arg::new("dry-run")
@@ -103,7 +103,9 @@ pub fn build_cli() -> Command {
         .subcommand(
             Command::new("export")
                 .about("Export manifest as JSON")
-                .long_about("Dump the apps manifest as portable JSON to stdout or a file.")
+                .long_about(
+                    "Dump app metadata as JSON to stdout or a file. Icons are not included.",
+                )
                 .arg(
                     Arg::new("file")
                         .index(1)

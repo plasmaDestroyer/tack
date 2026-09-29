@@ -110,7 +110,7 @@ tack update --all
 
 ### Export and Import
 
-You can export your installed apps manifest as a portable JSON file, and restore them on another machine:
+You can export your installed app metadata as JSON and recreate the apps on another machine:
 
 ```bash
 # Dump JSON to stdout
@@ -122,6 +122,8 @@ tack export backup.json
 # Restore from backup file
 tack import backup.json
 ```
+
+The JSON does not contain icon files. Import re-fetches icons or uses cached ones, so keep a separate copy of any custom icons you want to preserve.
 
 ### Remove an App
 
