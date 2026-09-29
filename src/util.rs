@@ -22,52 +22,50 @@ pub fn slugify(name: &str) -> String {
         .join("-")
 }
 
+pub fn validate_name(name: &str) -> Result<(), String> {
+    if slugify(name).is_empty() {
+        Err("App name must contain an ASCII letter or digit.".to_string())
+    } else {
+        Ok(())
+    }
+}
+
 pub fn normalize_url(url: &str) -> String {
-    if url.starts_with("http://") || url.starts_with("https://") {
+    if url.split_once("://").is_some_and(|(scheme, _)| {
+        !scheme.is_empty()
+            && scheme
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'-' | b'.'))
+    }) {
         String::from(url)
     } else {
         format!("https://{url}")
     }
 }
 
-/// Validate a URL after normalization.
-/// Checks: has scheme, has host, host has a dot, no spaces.
+/// Validate an HTTP(S) URL after normalization.
 pub fn validate_url(url: &str) -> Result<(), String> {
-    if url.contains(' ') {
-        return Err(format!("Invalid URL: '{}' contains spaces.", url));
+    if url.chars().any(char::is_whitespace) {
+        return Err(format!("Invalid URL: '{}' contains whitespace.", url));
     }
 
-    let after_scheme = if let Some(rest) = url.strip_prefix("https://") {
-        rest
-    } else if let Some(rest) = url.strip_prefix("http://") {
-        rest
-    } else {
-        return Err(format!(
-            "Invalid URL: '{}' is missing a scheme (http:// or https://).",
-            url
-        ));
-    };
-
-    // Extract host (everything before the first '/' or end)
-    let host = after_scheme.split('/').next().unwrap_or("");
-
-    // Strip port if present
-    let host_no_port = if let Some(bracket_end) = host.find(']') {
-        // IPv6: [::1]:port
-        &host[..bracket_end + 1]
-    } else {
-        host.split(':').next().unwrap_or("")
-    };
-
-    if host_no_port.is_empty() {
-        return Err(format!("Invalid URL: '{}' has an empty host.", url));
+    let parsed = reqwest::Url::parse(url).map_err(|e| format!("Invalid URL '{}': {e}.", url))?;
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return Err(format!("Invalid URL '{}': use http:// or https://.", url));
     }
-
-    // Allow localhost without a dot
-    if host_no_port != "localhost" && !host_no_port.contains('.') {
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| format!("Invalid URL '{}': missing host.", url))?;
+    if host != "localhost"
+        && !host.contains('.')
+        && host
+            .trim_matches(['[', ']'])
+            .parse::<std::net::IpAddr>()
+            .is_err()
+    {
         return Err(format!(
             "Invalid URL: host '{}' doesn't look like a valid domain (missing '.').",
-            host_no_port
+            host
         ));
     }
 

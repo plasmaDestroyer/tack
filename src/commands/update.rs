@@ -7,7 +7,9 @@ use crate::icon::{
 };
 use crate::manifest::{find_app_index, get_manifest_path, load_manifest, save_manifest};
 use crate::output;
-use crate::util::{get_share_dir, normalize_url, slugify, validate_app_browser, validate_url};
+use crate::util::{
+    get_share_dir, normalize_url, validate_app_browser, validate_name, validate_url,
+};
 
 #[derive(Default)]
 pub struct UpdateFlags {
@@ -63,10 +65,7 @@ pub fn update_app(
     let index = find_app_index(&entries, current_name)
         .ok_or_else(|| format!("App '{}' is not installed.", current_name))?;
     if let Some(new_name) = &flags.name {
-        let new_slug = slugify(new_name);
-        if new_slug.is_empty() {
-            return Err("App name must contain an ASCII letter or digit.".into());
-        }
+        validate_name(new_name)?;
         if find_app_index(&entries, new_name).is_some_and(|other| other != index) {
             return Err(format!("App '{}' is already installed.", new_name).into());
         }
@@ -84,10 +83,7 @@ pub fn update_app(
     if let Some(new_url) = &flags.url {
         let normalized = normalize_url(new_url);
         // Validate new URL (#23)
-        if let Err(msg) = validate_url(&normalized) {
-            output::error(&msg);
-            std::process::exit(1);
-        }
+        validate_url(&normalized)?;
         entry.url = normalized;
     }
     if let Some(new_browser) = &flags.browser {

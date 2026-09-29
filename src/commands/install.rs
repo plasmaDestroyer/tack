@@ -11,7 +11,7 @@ use crate::manifest::{
 use crate::output;
 use crate::util::{
     detect_browser, get_share_dir, normalize_url, resolve_browser, slugify, validate_app_browser,
-    validate_url,
+    validate_name, validate_url,
 };
 
 pub enum IconSource {
@@ -32,6 +32,7 @@ pub fn install_app(
 
     // Validate URL early (#23)
     validate_url(&url)?;
+    validate_name(name)?;
 
     let share_dir = get_share_dir()?;
     let slug = slugify(name);

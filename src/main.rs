@@ -21,7 +21,7 @@ use commands::remove::remove_app;
 use commands::update::{parse_update_flags, update_all_apps, update_app};
 use desktop::get_desktop_file_path;
 use output::OutputMode;
-use util::{detect_browsers, get_share_dir, normalize_url, slugify, validate_url};
+use util::{detect_browsers, get_share_dir, normalize_url, slugify, validate_name, validate_url};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().collect();
@@ -273,8 +273,8 @@ fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
 
     // 3. Name — typed while the favicon fetch runs in parallel
     let name = prompt("Enter the app name");
-    if name.is_empty() {
-        output::error("Name cannot be empty.");
+    if let Err(message) = validate_name(&name) {
+        output::error(&message);
         std::process::exit(1);
     }
 
