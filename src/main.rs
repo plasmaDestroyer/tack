@@ -58,6 +58,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     output::set_output_mode(mode);
 
+    let args: Vec<String> = args
+        .into_iter()
+        .filter(|arg| {
+            !matches!(
+                arg.as_str(),
+                "--dry-run" | "--quiet" | "-q" | "--verbose" | "-v"
+            )
+        })
+        .collect();
+
     // ── Interactive mode (#19) ──
     if interactive {
         return run_interactive(dry_run);
