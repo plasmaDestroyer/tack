@@ -2,13 +2,20 @@ use std::error::Error;
 use std::path::Path;
 
 use crate::desktop::get_desktop_file_path;
-use crate::manifest::{find_app_index, get_manifest_path, load_manifest, save_manifest};
+use crate::manifest::{
+    find_app_index, get_manifest_path, load_manifest, lock_manifest, save_manifest,
+};
 use crate::output;
 use crate::util::get_share_dir;
 
 pub fn remove_app(name: &str, dry_run: bool) -> Result<(), Box<dyn Error>> {
     let share_dir = get_share_dir()?;
     let manifest_path = get_manifest_path(&share_dir);
+    let _lock = if dry_run {
+        None
+    } else {
+        Some(lock_manifest(&manifest_path)?)
+    };
 
     let mut entries = load_manifest(&manifest_path)?;
     let position = find_app_index(&entries, name);

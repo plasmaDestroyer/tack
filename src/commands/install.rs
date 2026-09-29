@@ -6,7 +6,7 @@ use crate::icon::{
     DEFAULT_ICON, ImageFormat, detect_format, fetch_favicon, remove_replaced_icon, save_icon,
 };
 use crate::manifest::{
-    AppEntry, add_or_update_app, find_app_index, get_manifest_path, load_manifest,
+    AppEntry, add_or_update_app, find_app_index, get_manifest_path, load_manifest, lock_manifest,
 };
 use crate::output;
 use crate::util::{
@@ -45,16 +45,6 @@ pub fn install_app(
         )
         .into());
     }
-    let manifest_path = get_manifest_path(&share_dir);
-    let entries = load_manifest(&manifest_path)?;
-    if find_app_index(&entries, name).is_some_and(|index| !force || entries[index].slug != slug) {
-        return Err(format!("App '{}' is already installed.", name).into());
-    }
-    let old_icon = entries
-        .iter()
-        .find(|entry| entry.slug == slug)
-        .map(|entry| entry.icon_path.clone());
-
     if dry_run {
         output::info(&format!("Previewing installation of {} from {}", name, url));
     } else {
@@ -93,6 +83,21 @@ pub fn install_app(
     };
 
     output::verbose(&format!("Browser: {}", browser_name));
+
+    let manifest_path = get_manifest_path(&share_dir);
+    let _lock = if dry_run {
+        None
+    } else {
+        Some(lock_manifest(&manifest_path)?)
+    };
+    let entries = load_manifest(&manifest_path)?;
+    if find_app_index(&entries, name).is_some_and(|index| !force || entries[index].slug != slug) {
+        return Err(format!("App '{}' is already installed.", name).into());
+    }
+    let old_icon = entries
+        .iter()
+        .find(|entry| entry.slug == slug)
+        .map(|entry| entry.icon_path.clone());
 
     let mut user_supplied_icon = false;
 

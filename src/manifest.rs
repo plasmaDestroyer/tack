@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::error::Error;
+use std::fs::File;
 use std::io::Write;
+use std::os::fd::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -21,6 +23,20 @@ pub struct AppEntry {
 
 pub fn get_manifest_path(share_dir: &Path) -> PathBuf {
     share_dir.join("tack").join("apps.json")
+}
+
+pub fn lock_manifest(path: &Path) -> Result<File, Box<dyn Error>> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path.with_extension("lock"))?;
+    if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX) } != 0 {
+        return Err(std::io::Error::last_os_error().into());
+    }
+    Ok(file)
 }
 
 pub fn load_manifest(path: &Path) -> Result<Vec<AppEntry>, Box<dyn Error>> {

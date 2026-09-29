@@ -5,7 +5,9 @@ use crate::desktop::{create_desktop_file, get_desktop_file_path};
 use crate::icon::{
     DEFAULT_ICON, ImageFormat, detect_format, fetch_favicon, remove_replaced_icon, save_icon,
 };
-use crate::manifest::{find_app_index, get_manifest_path, load_manifest, save_manifest};
+use crate::manifest::{
+    find_app_index, get_manifest_path, load_manifest, lock_manifest, save_manifest,
+};
 use crate::output;
 use crate::util::{
     get_share_dir, normalize_url, validate_app_browser, validate_name, validate_url,
@@ -60,6 +62,11 @@ pub fn update_app(
 ) -> Result<(), Box<dyn Error>> {
     let share_dir = get_share_dir()?;
     let manifest_path = get_manifest_path(&share_dir);
+    let _lock = if dry_run {
+        None
+    } else {
+        Some(lock_manifest(&manifest_path)?)
+    };
     let mut entries = load_manifest(&manifest_path)?;
 
     let index = find_app_index(&entries, current_name)
