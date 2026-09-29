@@ -166,6 +166,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                             std::process::exit(1);
                         }
                     }
+                    unknown if unknown.starts_with('-') => {
+                        return Err(format!("Unknown flag: {unknown}").into());
+                    }
                     _ => {
                         positional.push(&args[i]);
                     }
@@ -173,7 +176,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 i += 1;
             }
 
-            if positional.len() < 2 {
+            if positional.len() != 2 {
                 output::error(
                     "Usage: tack <url> <name> [--force] [--icon PATH] [--browser BROWSER] [--dry-run] [--quiet] [--verbose]",
                 );
