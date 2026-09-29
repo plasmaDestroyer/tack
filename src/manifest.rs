@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::error::Error;
+use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::output;
 use crate::util::slugify;
@@ -49,8 +51,26 @@ pub fn save_manifest(
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let json = serde_json::to_string_pretty(entries)?;
-    std::fs::write(path, json)?;
+    let json = serde_json::to_vec_pretty(entries)?;
+    let temporary = path.with_extension(format!(
+        "json.tmp-{}-{}",
+        std::process::id(),
+        SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
+    ));
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary)?;
+    let result = (|| {
+        file.write_all(&json)?;
+        file.sync_all()?;
+        std::fs::rename(&temporary, path)?;
+        Ok::<(), std::io::Error>(())
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temporary);
+    }
+    result?;
     Ok(())
 }
 
@@ -67,4 +87,42 @@ pub fn add_or_update_app(
     }
     save_manifest(manifest_path, &entries, dry_run)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn manifest_write_replaces_file_and_cleans_failed_temporary_file() {
+        let root = std::env::temp_dir().join(format!(
+            "tack-manifest-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let path = root.join("apps.json");
+        std::fs::write(&path, "[]").unwrap();
+        let entries = [AppEntry {
+            name: "Demo".into(),
+            slug: "demo".into(),
+            url: "https://example.com".into(),
+            browser: "chromium".into(),
+            icon_path: "/tmp/demo.png".into(),
+            installed_at: 0,
+            user_supplied_icon: false,
+        }];
+        save_manifest(&path, &entries, false).unwrap();
+        assert_eq!(load_manifest(&path).unwrap()[0].name, "Demo");
+
+        let blocked = root.join("blocked.json");
+        std::fs::create_dir(&blocked).unwrap();
+        assert!(save_manifest(&blocked, &entries, false).is_err());
+        assert!(blocked.is_dir());
+        assert_eq!(std::fs::read_dir(&root).unwrap().count(), 2);
+        std::fs::remove_dir_all(root).unwrap();
+    }
 }
