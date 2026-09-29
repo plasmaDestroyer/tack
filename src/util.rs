@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 pub fn get_share_dir() -> Result<PathBuf, Box<dyn Error>> {
@@ -110,15 +111,9 @@ pub fn detect_browsers() -> Vec<String> {
     if let Ok(path) = std::env::var("PATH") {
         for browser in KNOWN_BROWSERS.iter() {
             for dir in std::env::split_paths(&path) {
-                let p = dir.join(browser);
-                if p.is_file() {
-                    use std::os::unix::fs::PermissionsExt;
-                    if let Ok(metadata) = p.metadata()
-                        && metadata.permissions().mode() & 0o111 != 0
-                    {
-                        found.push(browser.to_string());
-                        break; // found this browser, move to next
-                    }
+                if is_executable(&dir.join(browser)) {
+                    found.push(browser.to_string());
+                    break; // found this browser, move to next
                 }
             }
         }
@@ -126,9 +121,16 @@ pub fn detect_browsers() -> Vec<String> {
     found
 }
 
+fn is_executable(path: &Path) -> bool {
+    path.is_file()
+        && path
+            .metadata()
+            .is_ok_and(|metadata| metadata.permissions().mode() & 0o111 != 0)
+}
+
 fn is_on_path(name: &str) -> bool {
     if let Ok(path) = std::env::var("PATH") {
-        std::env::split_paths(&path).any(|dir| dir.join(name).is_file())
+        std::env::split_paths(&path).any(|dir| is_executable(&dir.join(name)))
     } else {
         false
     }

@@ -72,8 +72,8 @@ pub fn install_app(
             }
             None => {
                 return Err(format!(
-                    "Browser '{}' not found on PATH. Check the name with `which {}`.",
-                    browser_name, browser_name
+                    "Browser '{}' not found or not executable. Check its path and permissions.",
+                    browser_name
                 )
                 .into());
             }

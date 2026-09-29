@@ -106,8 +106,8 @@ pub fn update_app(
             }
             None => {
                 output::error(&format!(
-                    "Browser '{}' not found on PATH. Check the name with `which {}`.",
-                    new_browser, new_browser
+                    "Browser '{}' not found or not executable. Check its path and permissions.",
+                    new_browser
                 ));
                 std::process::exit(1);
             }
