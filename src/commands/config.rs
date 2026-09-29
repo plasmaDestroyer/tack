@@ -12,9 +12,14 @@ pub fn handle_config(args: &[String], dry_run: bool) -> Result<(), Box<dyn Error
     }
 
     match args[0].as_str() {
-        "show" => show_config(),
+        "show" => {
+            if args.len() != 1 {
+                return Err("Usage: tack config show".into());
+            }
+            show_config()
+        }
         "set" => {
-            if args.len() < 3 {
+            if args.len() != 3 {
                 output::error("Usage: tack config set <key> <value>");
                 std::process::exit(1);
             }

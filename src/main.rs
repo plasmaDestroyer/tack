@@ -83,18 +83,21 @@ fn main() -> Result<(), Box<dyn Error>> {
             std::process::exit(0);
         }
         "list" => {
+            if args.len() != 2 {
+                return Err("Usage: tack list".into());
+            }
             let share_dir = get_share_dir()?;
             list_apps(&share_dir)?;
         }
         "remove" => {
-            if args.len() < 3 {
+            if args.len() != 3 {
                 output::error("Usage: tack remove <name>");
                 std::process::exit(1);
             }
             remove_app(&args[2], dry_run)?;
         }
         "open" => {
-            if args.len() < 3 {
+            if args.len() != 3 {
                 output::error("Usage: tack open <name>");
                 std::process::exit(1);
             }
@@ -108,6 +111,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 std::process::exit(1);
             }
             if args[2] == "--all" {
+                if args.len() != 3 {
+                    return Err("Usage: tack update --all".into());
+                }
                 update_all_apps(dry_run)?;
             } else {
                 let flags = parse_update_flags(&args[3..])?;
@@ -118,32 +124,30 @@ fn main() -> Result<(), Box<dyn Error>> {
             handle_config(&args[2..], dry_run)?;
         }
         "export" => {
-            let output_path = args[2..]
-                .iter()
-                .find(|arg| {
-                    !matches!(
-                        arg.as_str(),
-                        "--dry-run" | "--quiet" | "-q" | "--verbose" | "-v"
-                    )
-                })
-                .map(|s| s.as_str());
+            if args.len() > 3 || args.get(2).is_some_and(|arg| arg.starts_with('-')) {
+                return Err("Usage: tack export [file]".into());
+            }
+            let output_path = args.get(2).map(String::as_str);
             export_apps(output_path, dry_run)?;
         }
         "import" => {
-            if args.len() < 3 {
+            if args.len() != 3 {
                 output::error("Usage: tack import <file>");
                 std::process::exit(1);
             }
             import_apps(&args[2], dry_run)?;
         }
         "completions" => {
-            if args.len() < 3 {
+            if args.len() != 3 {
                 output::error("Usage: tack completions <bash|zsh|fish>");
                 std::process::exit(1);
             }
             generate_completions(&args[2])?;
         }
         "manpage" => {
+            if args.len() != 2 {
+                return Err("Usage: tack manpage".into());
+            }
             generate_manpage()?;
         }
         _ => {
