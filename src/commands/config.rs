@@ -2,6 +2,7 @@ use std::error::Error;
 
 use crate::config::{get_config_path, load_config};
 use crate::output;
+use crate::util::validate_app_browser;
 
 pub fn handle_config(args: &[String], dry_run: bool) -> Result<(), Box<dyn Error>> {
     if args.is_empty() {
@@ -30,7 +31,7 @@ fn show_config() -> Result<(), Box<dyn Error>> {
     let config = load_config();
     let browser = config
         .browser
-        .unwrap_or_else(|| "detect from PATH (fallback to chromium)".to_string());
+        .unwrap_or_else(|| "detect from PATH".to_string());
     let categories = config.categories.unwrap_or_else(|| "Network;".to_string());
 
     output::info("Current configuration:");
@@ -41,6 +42,20 @@ fn show_config() -> Result<(), Box<dyn Error>> {
 }
 
 fn set_config(key: &str, value: &str, dry_run: bool) -> Result<(), Box<dyn Error>> {
+    if !matches!(key, "browser" | "categories") {
+        return Err(format!("Unknown config key: {key}. Use browser or categories.").into());
+    }
+    if value.trim().is_empty()
+        || value
+            .chars()
+            .any(|c| c.is_control() || matches!(c, '"' | '\'' | '\\'))
+    {
+        return Err("Config value must be nonempty and contain no quotes, backslashes, or control characters.".into());
+    }
+    if key == "browser" {
+        validate_app_browser(value)?;
+    }
+
     let config_path = get_config_path();
     if dry_run {
         output::dry_run(&format!("would set {} in {}", key, config_path.display()));
@@ -50,9 +65,8 @@ fn set_config(key: &str, value: &str, dry_run: bool) -> Result<(), Box<dyn Error
     // Read existing file
     let mut lines = Vec::new();
     if config_path.exists() {
-        if let Ok(contents) = std::fs::read_to_string(&config_path) {
-            lines = contents.lines().map(|s| s.to_string()).collect();
-        }
+        let contents = std::fs::read_to_string(&config_path)?;
+        lines = contents.lines().map(|s| s.to_string()).collect();
     } else {
         if let Some(parent) = config_path.parent() {
             std::fs::create_dir_all(parent)?;
