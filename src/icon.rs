@@ -17,61 +17,82 @@ pub enum ImageFormat {
     Ico,
 }
 
-fn get_href(original_tag: &str) -> Option<String> {
-    let tag_lower = original_tag.to_ascii_lowercase();
-    if let Some(href_idx) = tag_lower.find("href=\"") {
-        let start = href_idx + 6;
-        if let Some(end) = tag_lower[start..].find('"') {
-            return Some(original_tag[start..start + end].to_string());
+fn attribute<'a>(tag: &'a str, name: &str) -> Option<&'a str> {
+    let (_, mut rest) = tag.split_once(char::is_whitespace)?;
+    loop {
+        rest = rest.trim_start();
+        let end = rest
+            .find(|c: char| c.is_whitespace() || matches!(c, '=' | '>' | '/'))
+            .unwrap_or(rest.len());
+        if end == 0 {
+            return None;
+        }
+        let key = &rest[..end];
+        rest = rest[end..].trim_start();
+        let Some(value) = rest.strip_prefix('=') else {
+            continue;
+        };
+        rest = value.trim_start();
+        let value = if rest.starts_with(['\'', '"']) {
+            let quote = rest.chars().next()?;
+            rest = &rest[1..];
+            let end = rest.find(quote)?;
+            let value = &rest[..end];
+            rest = &rest[end + 1..];
+            value
+        } else {
+            let end = rest
+                .find(|c: char| c.is_whitespace() || c == '>')
+                .unwrap_or(rest.len());
+            let value = &rest[..end];
+            rest = &rest[end..];
+            value
+        };
+        if key.eq_ignore_ascii_case(name) {
+            return Some(value);
         }
     }
-    if let Some(href_idx) = tag_lower.find("href='") {
-        let start = href_idx + 6;
-        if let Some(end) = tag_lower[start..].find('\'') {
-            return Some(original_tag[start..start + end].to_string());
-        }
-    }
-    None
 }
 
 fn find_icon_in_html(html: &str) -> Option<String> {
-    let html_lower = html.to_ascii_lowercase();
-    let mut best_href = None;
+    // ponytail: common link markup only; use an HTML parser if malformed tags matter.
+    let lower = html.to_ascii_lowercase();
+    let mut best = None;
     let mut best_score = 0;
-
-    let mut search_start = 0;
-    while let Some(idx) = html_lower[search_start..].find("<link ") {
-        let tag_start = search_start + idx;
-        let tag_end_idx = html_lower[tag_start..].find('>');
-        if let Some(end_offset) = tag_end_idx {
-            let tag_lower = &html_lower[tag_start..tag_start + end_offset + 1];
-
-            let mut score = 0;
-            if tag_lower.contains("rel=\"apple-touch-icon\"")
-                || tag_lower.contains("rel='apple-touch-icon'")
-            {
-                score = 3;
-            } else if tag_lower.contains("rel=\"icon\"") || tag_lower.contains("rel='icon'") {
-                score = 2;
-            } else if tag_lower.contains("rel=\"shortcut icon\"")
-                || tag_lower.contains("rel='shortcut icon'")
-            {
-                score = 1;
-            }
-
-            if score > best_score {
-                let original_tag = &html[tag_start..tag_start + end_offset + 1];
-                if let Some(href) = get_href(original_tag) {
-                    best_score = score;
-                    best_href = Some(href);
-                }
-            }
-            search_start = tag_start + end_offset;
+    for (start, _) in lower.match_indices("<link") {
+        if !lower
+            .as_bytes()
+            .get(start + 5)
+            .is_some_and(u8::is_ascii_whitespace)
+        {
+            continue;
+        }
+        let Some(end) = html[start..].find('>') else {
+            continue;
+        };
+        let tag = &html[start..start + end + 1];
+        let Some(rel) = attribute(tag, "rel") else {
+            continue;
+        };
+        let has = |kind: &str| {
+            rel.split_ascii_whitespace()
+                .any(|token| token.eq_ignore_ascii_case(kind))
+        };
+        let score = if has("apple-touch-icon") {
+            3
+        } else if has("icon") {
+            if has("shortcut") { 1 } else { 2 }
         } else {
-            break;
+            0
+        };
+        if score > best_score
+            && let Some(href) = attribute(tag, "href").filter(|href| !href.is_empty())
+        {
+            best = Some(href.replace("&amp;", "&").replace("&#38;", "&"));
+            best_score = score;
         }
     }
-    best_href
+    best
 }
 
 fn read_body(response: Response) -> Option<Vec<u8>> {
@@ -235,6 +256,25 @@ pub fn detect_format(bytes: &[u8]) -> Option<ImageFormat> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn icon_links_handle_common_attribute_layouts() {
+        for (html, href) in [
+            ("<LINK\nREL = 'ICON' HREF = /logo.png>", "/logo.png"),
+            (
+                "<link rel='icon' data-href='wrong.png' href=\"/good.svg?a=1&amp;b=2\">",
+                "/good.svg?a=1&b=2",
+            ),
+            (
+                "<link rel=icon href=small.png><link rel='apple-touch-icon' href=large.png>",
+                "large.png",
+            ),
+        ] {
+            assert_eq!(find_icon_in_html(html).as_deref(), Some(href));
+        }
+        assert!(find_icon_in_html("<linker rel=icon href=wrong.png>").is_none());
+        assert!(find_icon_in_html("<link rel=stylesheet href=style.css>").is_none());
+    }
 
     #[test]
     fn cleanup_rejects_slugs_that_escape_the_icons_directory() {
