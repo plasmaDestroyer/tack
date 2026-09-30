@@ -19,7 +19,7 @@ tack update <name> [--name NAME] [--url URL] [--browser BROWSER] [--icon PATH] [
 tack update --all
 tack remove <name> [--dry-run]
 tack export [file] [--no-icons]
-tack import <file>
+tack import <file> [--browser BROWSER]
 tack completions <bash|zsh|fish>
 tack manpage
 tack config show
@@ -123,7 +123,7 @@ tack export backup.json
 tack import backup.json
 ```
 
-Icons are embedded as JSON byte arrays, including custom icons. Import restores them into the new machine's data directory and preserves custom icons during later repairs. Browser executables must be available on the destination.
+Icons are embedded as JSON byte arrays, including custom icons. Import restores them into the new machine's data directory and preserves custom icons during later repairs. If the saved browser paths differ, use `tack import backup.json --browser chromium` to select the destination's browser for all apps.
 
 Older metadata-only backups still work; import re-fetches icons or uses cached ones when no image is embedded. Use `tack export backup.json --no-icons` for a smaller metadata-only backup. Export fails if a custom icon cannot be read, so it cannot silently lose your image.
 

@@ -111,5 +111,31 @@ fn portable_backups_restore_icons_without_the_source_files() {
     assert!(String::from_utf8_lossy(&partial.stderr).contains("1 of 2 apps failed to import"));
     assert!(!root.join("partial/applications/custom.desktop").exists());
     assert!(root.join("partial/applications/fetched.desktop").exists());
+
+    entries[0]["icon_data"] = serde_json::from_slice::<serde_json::Value>(&exported.stdout)
+        .unwrap()[0]["icon_data"]
+        .clone();
+    for app in entries.as_array_mut().unwrap() {
+        app["browser"] = "/missing/source-browser".into();
+    }
+    std::fs::write(&backup, serde_json::to_vec(&entries).unwrap()).unwrap();
+    assert!(
+        !run("override", &["import", args[1], "--browser", "firefox"])
+            .status
+            .success()
+    );
+    assert!(!root.join("override").exists());
+    let overridden = run("override", &["import", args[1], "--browser", "/bin/true"]);
+    assert!(overridden.status.success(), "{overridden:?}");
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(root.join("override/tack/apps.json")).unwrap())
+            .unwrap();
+    assert!(
+        manifest
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|app| app["browser"] == "/bin/true")
+    );
     std::fs::remove_dir_all(root).unwrap();
 }

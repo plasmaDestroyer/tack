@@ -83,7 +83,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
         }
         Some(("import", command)) => {
-            import_apps(command.get_one::<String>("file").unwrap(), dry_run)?;
+            import_apps(
+                command.get_one::<String>("file").unwrap(),
+                command.get_one::<String>("browser").map(String::as_str),
+                dry_run,
+            )?;
         }
         Some(("completions", command)) => {
             generate_completions(*command.get_one::<clap_complete::Shell>("shell").unwrap());

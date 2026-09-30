@@ -144,6 +144,12 @@ pub fn build_cli() -> Command {
                     "Restore apps and embedded icons from an exported JSON file. \
                      Older metadata-only backups remain supported; missing icons are re-fetched.",
                 )
+                .arg(
+                    Arg::new("browser")
+                        .long("browser")
+                        .value_name("BROWSER")
+                        .help("Use this browser for every restored app"),
+                )
                 .arg(Arg::new("file").required(true).index(1)),
         )
         .subcommand(

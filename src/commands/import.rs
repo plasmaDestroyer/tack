@@ -6,7 +6,11 @@ use crate::commands::install::{IconSource, install_app};
 use crate::icon::detect_format;
 use crate::output;
 
-pub fn import_apps(input_path: &str, dry_run: bool) -> Result<(), Box<dyn Error>> {
+pub fn import_apps(
+    input_path: &str,
+    browser: Option<&str>,
+    dry_run: bool,
+) -> Result<(), Box<dyn Error>> {
     let content = fs::read_to_string(input_path)?;
     let entries: Vec<BackupEntry> = serde_json::from_str(&content)?;
 
@@ -37,7 +41,14 @@ pub fn import_apps(input_path: &str, dry_run: bool) -> Result<(), Box<dyn Error>
                 }
                 None => None,
             };
-            install_app(&app.url, &app.name, true, icon, Some(app.browser), dry_run)
+            install_app(
+                &app.url,
+                &app.name,
+                true,
+                icon,
+                Some(browser.unwrap_or(&app.browser).to_string()),
+                dry_run,
+            )
         })();
         if let Err(e) = result {
             output::error(&format!("Failed to import {}: {}", app.name, e));
