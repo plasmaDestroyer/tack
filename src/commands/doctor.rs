@@ -57,7 +57,7 @@ pub fn doctor_apps(name: Option<&str>) -> Result<(), Box<dyn Error>> {
             if safe_slug {
                 issues.push(if entry.user_supplied_icon {
                     format!(
-                        "Restore custom icon with: tack update {} --icon PATH",
+                        "Restore custom icon with: tack update {} --icon PATH (or --default-icon)",
                         entry.slug
                     )
                 } else {

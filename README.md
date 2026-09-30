@@ -44,6 +44,8 @@ You can also bypass the automatic icon fetching by providing a custom icon path:
 tack https://youtube.com YouTube --icon /path/to/my-icon.png
 ```
 
+Use `--default-icon` to install with the bundled icon immediately, without network requests.
+
 To specify a browser explicitly instead of relying on auto-detection:
 
 ```bash
@@ -108,6 +110,8 @@ tack update YouTube --name "YouTube Music" --url https://music.youtube.com
 ```
 
 If no flags are provided, `tack update` runs in "repair mode", which re-fetches the favicon and regenerates the `.desktop` file.
+
+Custom icons are preserved during repair. If yours is missing, restore it with `--icon PATH`, or reset it with `tack update YouTube --default-icon`. Resetting allows future repairs to fetch a favicon again.
 
 To update all applications at once (e.g. re-fetching missing icons and regenerating desktop files for every installed app):
 

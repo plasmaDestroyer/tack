@@ -80,6 +80,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     url: command.get_one::<String>("url").cloned(),
                     browser: command.get_one::<String>("browser").cloned(),
                     icon: command.get_one::<String>("icon").cloned(),
+                    default_icon: command.get_flag("default-icon"),
                 };
                 update_app(command.get_one::<String>("name").unwrap(), flags, dry_run)?;
             }
@@ -117,9 +118,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                     app.next().unwrap(),
                     app.next().unwrap(),
                     args.get_flag("force"),
-                    args.get_one::<String>("icon")
-                        .cloned()
-                        .map(IconSource::File),
+                    if args.get_flag("default-icon") {
+                        Some(IconSource::Default)
+                    } else {
+                        args.get_one::<String>("icon")
+                            .cloned()
+                            .map(IconSource::File)
+                    },
                     args.get_one::<String>("browser").cloned(),
                     dry_run,
                 )?;

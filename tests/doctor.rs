@@ -48,6 +48,43 @@ fn doctor_reports_missing_files_and_browsers_without_writes() {
     assert_eq!(std::fs::read(&manifest).unwrap(), original);
     assert!(!root.join("applications/demo.desktop").exists());
     assert!(!root.join("icons/demo.png").exists());
+    let repair = run(&["update", "Demo"]);
+    assert!(!repair.status.success());
+    assert!(String::from_utf8_lossy(&repair.stderr).contains("Custom icon is missing"));
+    assert!(
+        run(&["update", "Demo", "--default-icon", "--dry-run"])
+            .status
+            .success()
+    );
+    assert!(!root.join("icons/demo.png").exists());
+    assert!(run(&["update", "Demo", "--default-icon"]).status.success());
+    assert_eq!(
+        std::fs::read(root.join("icons/demo.png")).unwrap(),
+        std::fs::read(icon).unwrap()
+    );
+    assert!(run(&["doctor", "Demo"]).status.success());
+    assert!(!run(&["update", "--all", "--default-icon"]).status.success());
+    assert!(
+        !run(&["update", "Demo", "--default-icon", "--icon", icon])
+            .status
+            .success()
+    );
+
+    assert!(
+        run(&[
+            "https://example.com",
+            "Default",
+            "--browser",
+            "/bin/true",
+            "--default-icon"
+        ])
+        .status
+        .success()
+    );
+    assert_eq!(
+        std::fs::read(root.join("icons/default.png")).unwrap(),
+        std::fs::read(icon).unwrap()
+    );
     let mut entries: serde_json::Value = serde_json::from_slice(&original).unwrap();
     entries[0]["browser"] = "/missing/browser".into();
     std::fs::write(&manifest, serde_json::to_vec(&entries).unwrap()).unwrap();

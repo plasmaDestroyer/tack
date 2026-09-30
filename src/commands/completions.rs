@@ -43,6 +43,14 @@ pub fn build_cli() -> Command {
                 .help("Browser to use (e.g. chromium, brave-browser)"),
         )
         .arg(
+            Arg::new("default-icon")
+                .long("default-icon")
+                .requires("app")
+                .conflicts_with("icon")
+                .help("Use the bundled icon without fetching")
+                .action(clap::ArgAction::SetTrue),
+        )
+        .arg(
             Arg::new("dry-run")
                 .long("dry-run")
                 .global(true)
@@ -70,7 +78,7 @@ pub fn build_cli() -> Command {
             Arg::new("interactive")
                 .long("interactive")
                 .short('i')
-                .conflicts_with_all(["app", "force", "icon", "browser"])
+                .conflicts_with_all(["app", "force", "icon", "browser", "default-icon"])
                 .help("Run in interactive mode")
                 .action(clap::ArgAction::SetTrue),
         )
@@ -132,14 +140,21 @@ pub fn build_cli() -> Command {
                 .arg(
                     Arg::new("all")
                         .long("all")
-                        .conflicts_with_all(["new-name", "url", "browser", "icon"])
+                        .conflicts_with_all(["new-name", "url", "browser", "icon", "default-icon"])
                         .help("Update all installed apps")
                         .action(clap::ArgAction::SetTrue),
                 )
                 .arg(Arg::new("new-name").long("name").value_name("NAME"))
                 .arg(Arg::new("url").long("url").value_name("URL"))
                 .arg(Arg::new("browser").long("browser").value_name("BROWSER"))
-                .arg(Arg::new("icon").long("icon").value_name("PATH")),
+                .arg(Arg::new("icon").long("icon").value_name("PATH"))
+                .arg(
+                    Arg::new("default-icon")
+                        .long("default-icon")
+                        .conflicts_with("icon")
+                        .help("Replace the icon with the bundled default")
+                        .action(clap::ArgAction::SetTrue),
+                ),
         )
         .subcommand(
             Command::new("export")

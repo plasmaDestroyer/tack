@@ -14,6 +14,7 @@ use crate::util::{get_share_dir, normalize_url, resolve_app_browser, validate_na
 #[derive(Default)]
 pub struct UpdateFlags {
     pub icon: Option<String>,
+    pub default_icon: bool,
     pub url: Option<String>,
     pub browser: Option<String>,
     pub name: Option<String>,
@@ -45,6 +46,7 @@ pub fn update_app(
     let slug = entry.slug.clone();
 
     let has_overrides = flags.icon.is_some()
+        || flags.default_icon
         || flags.url.is_some()
         || flags.browser.is_some()
         || flags.name.is_some();
@@ -65,7 +67,11 @@ pub fn update_app(
     entry.browser = resolve_app_browser(&entry.browser)?;
 
     // Handle icon: explicit --icon flag, or repair-mode re-fetch
-    if let Some(icon_arg) = &flags.icon {
+    if flags.default_icon {
+        let path = save_icon(&slug, DEFAULT_ICON, ImageFormat::Png, &share_dir, dry_run)?;
+        entry.icon_path = path.display().to_string();
+        entry.user_supplied_icon = false;
+    } else if let Some(icon_arg) = &flags.icon {
         let icon_path_buf = PathBuf::from(icon_arg);
         if icon_path_buf.exists() {
             // User supplied a local file
@@ -79,11 +85,16 @@ pub fn update_app(
             entry.icon_path = saved.display().to_string();
             entry.user_supplied_icon = true;
         } else {
-            output::error(&format!("Icon file not found: {}", icon_arg));
-            std::process::exit(1);
+            return Err(format!("Icon file not found: {}", icon_arg).into());
         }
     } else if !has_overrides {
         if entry.user_supplied_icon {
+            if !PathBuf::from(&entry.icon_path).is_file() {
+                return Err(
+                    "Custom icon is missing. Restore it with --icon PATH or use --default-icon."
+                        .into(),
+                );
+            }
             output::info("Repair mode: skipping favicon re-fetch because it is user-supplied.");
         } else {
             // Repair mode: re-fetch favicon from the app's URL
