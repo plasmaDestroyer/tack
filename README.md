@@ -169,6 +169,8 @@ tack config set categories "Network;Entertainment;"
 
 Generate tab-completion scripts for your shell:
 
+Fish completions also suggest installed app names for `open`, `remove`, `update`, and `doctor`.
+
 ```bash
 # Bash — append to ~/.bashrc
 tack completions bash >> ~/.bashrc

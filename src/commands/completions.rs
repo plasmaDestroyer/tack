@@ -223,6 +223,11 @@ pub fn build_cli() -> Command {
 pub fn generate_completions(shell: Shell) {
     let mut cmd = build_cli();
     generate(shell, &mut cmd, "tack", &mut io::stdout());
+    if shell == Shell::Fish {
+        println!(
+            "complete -c tack -n '__fish_seen_subcommand_from open remove update doctor; and test (__fish_number_of_cmd_args_wo_opts) -eq 2; and not __fish_seen_argument -l all' -f -a '(command tack list --names 2>/dev/null)'"
+        );
+    }
 }
 
 pub fn generate_manpage() -> Result<(), Box<dyn Error>> {

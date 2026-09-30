@@ -58,6 +58,7 @@ fn global_flags_work_before_commands() {
     assert!(verbose_completions.status.success());
     assert!(!completions.stdout.is_empty());
     assert_eq!(verbose_completions.stdout, completions.stdout);
+    assert!(String::from_utf8_lossy(&completions.stdout).contains("command tack list --names"));
     let quiet = run(&["--quiet", "list"]);
     assert!(quiet.status.success());
     assert!(quiet.stdout.is_empty());
