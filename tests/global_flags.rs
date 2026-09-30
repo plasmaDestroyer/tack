@@ -55,5 +55,20 @@ fn global_flags_work_before_commands() {
     assert!(quiet.status.success());
     assert!(quiet.stdout.is_empty());
 
+    for args in [
+        vec!["-q", "list", "-v"],
+        vec!["--verbose", "list", "--quiet"],
+        vec!["config", "-q", "set", "browser", "chromium", "-v"],
+    ] {
+        let output = run(&args);
+        assert!(!output.status.success(), "{args:?}");
+        assert!(
+            String::from_utf8_lossy(&output.stderr)
+                .contains("Cannot use --quiet and --verbose together")
+        );
+    }
+    assert!(!root.join("config").exists());
+    assert_eq!(std::fs::read(&manifest).unwrap(), before);
+
     std::fs::remove_dir_all(root).unwrap();
 }

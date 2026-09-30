@@ -25,6 +25,14 @@ use util::{detect_browsers, get_share_dir, normalize_url, slugify, validate_name
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = build_cli().get_matches();
+    if args.get_flag("quiet") && args.get_flag("verbose") {
+        build_cli()
+            .error(
+                clap::error::ErrorKind::ArgumentConflict,
+                "Cannot use --quiet and --verbose together.",
+            )
+            .exit();
+    }
     if args.subcommand().is_some()
         && (args.get_one::<String>("url").is_some() || args.get_flag("interactive"))
     {
