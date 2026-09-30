@@ -4,7 +4,7 @@ use std::process::Stdio;
 
 use crate::manifest::{find_app_index, get_manifest_path, load_manifest};
 use crate::output;
-use crate::util::{get_share_dir, validate_app_browser};
+use crate::util::{get_share_dir, resolve_app_browser};
 
 pub fn open_app(name: &str, dry_run: bool) -> Result<(), Box<dyn Error>> {
     let share_dir = get_share_dir()?;
@@ -14,17 +14,17 @@ pub fn open_app(name: &str, dry_run: bool) -> Result<(), Box<dyn Error>> {
     let entry = find_app_index(&entries, name)
         .map(|index| &entries[index])
         .ok_or_else(|| format!("App '{}' is not installed.", name))?;
-    validate_app_browser(&entry.browser)?;
+    let browser = resolve_app_browser(&entry.browser)?;
 
     if dry_run {
-        output::dry_run(&format!("would open {} with {}", entry.url, entry.browser));
+        output::dry_run(&format!("would open {} with {}", entry.url, browser));
         return Ok(());
     }
 
     output::info(&format!("Opening {} ({})", entry.name, entry.url));
 
     unsafe {
-        std::process::Command::new(&entry.browser)
+        std::process::Command::new(&browser)
             .arg(format!("--app={}", entry.url))
             .stdin(Stdio::null())
             .stdout(Stdio::null())

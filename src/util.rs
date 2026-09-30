@@ -140,6 +140,9 @@ fn is_on_path(name: &str) -> bool {
 /// Tries an exact match first, then a prefix match against known browsers
 /// (e.g. "brave" -> "brave-browser").
 pub fn resolve_browser(name: &str) -> Option<String> {
+    if name.trim().is_empty() {
+        return None;
+    }
     if is_on_path(name) {
         return Some(name.to_string());
     }
@@ -147,4 +150,13 @@ pub fn resolve_browser(name: &str) -> Option<String> {
         .iter()
         .find(|b| b.starts_with(name) && is_on_path(b))
         .map(|b| b.to_string())
+}
+
+pub fn resolve_app_browser(name: &str) -> Result<String, String> {
+    validate_app_browser(name)?;
+    let browser = resolve_browser(name).ok_or_else(|| {
+        format!("Browser '{name}' not found or not executable. Check its path and permissions.")
+    })?;
+    validate_app_browser(&browser)?;
+    Ok(browser)
 }

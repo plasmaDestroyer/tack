@@ -9,9 +9,7 @@ use crate::manifest::{
     find_app_index, get_manifest_path, load_manifest, lock_manifest, save_manifest,
 };
 use crate::output;
-use crate::util::{
-    get_share_dir, normalize_url, validate_app_browser, validate_name, validate_url,
-};
+use crate::util::{get_share_dir, normalize_url, resolve_app_browser, validate_name, validate_url};
 
 #[derive(Default)]
 pub struct UpdateFlags {
@@ -59,29 +57,12 @@ pub fn update_app(
         entry.url = normalized;
     }
     if let Some(new_browser) = &flags.browser {
-        match crate::util::resolve_browser(new_browser) {
-            Some(resolved) => {
-                if resolved != *new_browser {
-                    output::info(&format!(
-                        "Resolved browser '{}' to '{}'",
-                        new_browser, resolved
-                    ));
-                }
-                entry.browser = resolved;
-            }
-            None => {
-                output::error(&format!(
-                    "Browser '{}' not found or not executable. Check its path and permissions.",
-                    new_browser
-                ));
-                std::process::exit(1);
-            }
-        }
+        entry.browser = new_browser.clone();
     }
     if let Some(new_name) = &flags.name {
         entry.name = new_name.clone();
     }
-    validate_app_browser(&entry.browser)?;
+    entry.browser = resolve_app_browser(&entry.browser)?;
 
     // Handle icon: explicit --icon flag, or repair-mode re-fetch
     if let Some(icon_arg) = &flags.icon {

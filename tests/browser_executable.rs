@@ -41,5 +41,30 @@ fn browser_must_be_executable() {
     std::fs::set_permissions(&browser, std::fs::Permissions::from_mode(0o755)).unwrap();
     assert!(run("Auto", false).status.success());
     assert!(run("Explicit", true).status.success());
+
+    let manifest = root.join("data/tack/apps.json");
+    let desktop = root.join("data/applications/auto.desktop");
+    let before_manifest = std::fs::read(&manifest).unwrap();
+    let before_desktop = std::fs::read(&desktop).unwrap();
+    std::fs::set_permissions(&browser, std::fs::Permissions::from_mode(0o644)).unwrap();
+    for args in [
+        vec!["open", "Auto", "--dry-run"],
+        vec!["open", "Auto"],
+        vec!["update", "Auto", "--dry-run"],
+        vec!["update", "--all"],
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_tack"))
+            .args(&args)
+            .env("PATH", &bin)
+            .env("XDG_DATA_HOME", root.join("data"))
+            .env("XDG_CONFIG_HOME", root.join("config"))
+            .env("NO_COLOR", "1")
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "{args:?}");
+        assert!(String::from_utf8_lossy(&output.stderr).contains("not executable"));
+    }
+    assert_eq!(std::fs::read(&manifest).unwrap(), before_manifest);
+    assert_eq!(std::fs::read(&desktop).unwrap(), before_desktop);
     std::fs::remove_dir_all(root).unwrap();
 }

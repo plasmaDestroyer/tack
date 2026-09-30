@@ -10,8 +10,8 @@ use crate::manifest::{
 };
 use crate::output;
 use crate::util::{
-    detect_browser, get_share_dir, normalize_url, resolve_browser, slugify, validate_app_browser,
-    validate_name, validate_url,
+    detect_browser, get_share_dir, normalize_url, resolve_app_browser, slugify, validate_name,
+    validate_url,
 };
 
 pub enum IconSource {
@@ -56,35 +56,18 @@ pub fn install_app(
     }
 
     let config = crate::config::load_config();
-    let user_supplied_browser = browser_arg.is_some() || config.browser.is_some();
     let browser_name = browser_arg
         .or(config.browser)
         .or_else(detect_browser)
         .ok_or("No supported browser found on PATH. Install a Chromium-based browser or use --browser.")?;
-    validate_app_browser(&browser_name)?;
-
-    let browser_name = if user_supplied_browser {
-        match resolve_browser(&browser_name) {
-            Some(resolved) => {
-                if resolved != browser_name {
-                    output::info(&format!(
-                        "Resolved browser '{}' to '{}'",
-                        browser_name, resolved
-                    ));
-                }
-                resolved
-            }
-            None => {
-                return Err(format!(
-                    "Browser '{}' not found or not executable. Check its path and permissions.",
-                    browser_name
-                )
-                .into());
-            }
-        }
-    } else {
-        browser_name
-    };
+    let resolved = resolve_app_browser(&browser_name)?;
+    if resolved != browser_name {
+        output::info(&format!(
+            "Resolved browser '{}' to '{}'",
+            browser_name, resolved
+        ));
+    }
+    let browser_name = resolved;
 
     output::verbose(&format!("Browser: {}", browser_name));
 
