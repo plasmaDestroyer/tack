@@ -1,8 +1,9 @@
 use std::error::Error;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use reqwest::blocking::Client;
+use reqwest::blocking::{Client, Response};
 
 use crate::ico;
 use crate::output;
@@ -73,17 +74,35 @@ fn find_icon_in_html(html: &str) -> Option<String> {
     best_href
 }
 
-fn fetch_svgl_icon(url: &str, client: &Client) -> Option<Vec<u8>> {
-    let parsed_target = reqwest::Url::parse(url).ok()?;
-    let target_host = parsed_target.host_str()?.replace("www.", "");
-
-    let response = client.get("https://api.svgl.app").send().ok()?;
-    if !response.status().is_success() {
+fn read_body(response: Response) -> Option<Vec<u8>> {
+    // ponytail: cap network bodies at 5 MiB; raise if real icon sources need more.
+    const MAX_BYTES: u64 = 5 * 1024 * 1024;
+    if !response.status().is_success()
+        || response
+            .content_length()
+            .is_some_and(|size| size > MAX_BYTES)
+    {
         return None;
     }
+    let mut bytes = Vec::new();
+    response.take(MAX_BYTES + 1).read_to_end(&mut bytes).ok()?;
+    (bytes.len() as u64 <= MAX_BYTES).then_some(bytes)
+}
 
-    let text = response.text().ok()?;
-    let json: serde_json::Value = serde_json::from_str(&text).ok()?;
+fn fetch_icon(client: &Client, url: &str) -> Option<Vec<u8>> {
+    let bytes = read_body(client.get(url).send().ok()?)?;
+    match detect_format(&bytes)? {
+        ImageFormat::Ico => ico::ico_to_png(&bytes).ok(),
+        _ => Some(bytes),
+    }
+}
+
+fn fetch_svgl_icon(url: &str, client: &Client) -> Option<Vec<u8>> {
+    let parsed_target = reqwest::Url::parse(url).ok()?;
+    let target_host = parsed_target.host_str()?.trim_start_matches("www.");
+
+    let bytes = read_body(client.get("https://api.svgl.app").send().ok()?)?;
+    let json: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
     let entries = json.as_array()?;
 
     for entry in entries {
@@ -91,7 +110,7 @@ fn fetch_svgl_icon(url: &str, client: &Client) -> Option<Vec<u8>> {
             && let Ok(parsed_entry) = reqwest::Url::parse(entry_url_str)
             && let Some(entry_host) = parsed_entry.host_str()
         {
-            let entry_host_clean = entry_host.replace("www.", "");
+            let entry_host_clean = entry_host.trim_start_matches("www.");
             if entry_host_clean == target_host {
                 let route = entry.get("route");
                 let svg_url = if let Some(r) = route.and_then(|r| r.as_str()) {
@@ -105,11 +124,9 @@ fn fetch_svgl_icon(url: &str, client: &Client) -> Option<Vec<u8>> {
                 };
 
                 if let Some(dl_url) = svg_url
-                    && let Ok(r) = client.get(dl_url).send()
-                    && r.status().is_success()
-                    && let Ok(bytes) = r.bytes()
+                    && let Some(bytes) = fetch_icon(client, dl_url)
                 {
-                    return Some(bytes.to_vec());
+                    return Some(bytes);
                 }
             }
         }
@@ -128,66 +145,26 @@ pub fn fetch_favicon(url: &str) -> Option<Vec<u8>> {
         return Some(svgl_bytes);
     }
 
-    let parsed_url = reqwest::Url::parse(url).ok()?;
+    let mut parsed_url = reqwest::Url::parse(url).ok()?;
 
-    // 1. Try fetching the HTML to find icon tags
-    if let Ok(response) = client.get(url).send()
-        && response.status().is_success()
-        && let Ok(html) = response.text()
-        && let Some(href) = find_icon_in_html(&html)
-        && let Ok(icon_url) = parsed_url.join(&href)
-    {
-        let icon_response = client.get(icon_url).send().ok();
-        if let Some(r) = icon_response
-            && r.status().is_success()
-            && let Ok(bytes) = r.bytes()
+    if let Ok(response) = client.get(url).send() {
+        parsed_url = response.url().clone();
+        if let Some(bytes) = read_body(response)
+            && let Some(href) = find_icon_in_html(&String::from_utf8_lossy(&bytes))
+            && let Ok(icon_url) = parsed_url.join(&href)
+            && let Some(icon) = fetch_icon(&client, icon_url.as_str())
         {
-            return Some(bytes.to_vec());
+            return Some(icon);
         }
     }
-
-    // 2. Fallback to /favicon.ico directly
-    if let Ok(favicon_url) = parsed_url.join("/favicon.ico") {
-        let direct_bytes = client
-            .get(favicon_url)
-            .send()
-            .ok()
-            .and_then(|r| {
-                if r.status().is_success() {
-                    r.bytes().ok()
-                } else {
-                    None
-                }
-            })
-            .map(|b| b.to_vec());
-
-        if direct_bytes.is_some() {
-            return direct_bytes;
-        }
+    if let Ok(favicon_url) = parsed_url.join("/favicon.ico")
+        && let Some(icon) = fetch_icon(&client, favicon_url.as_str())
+    {
+        return Some(icon);
     }
-
-    // 3. Fallback to Google Favicon API
-    if let Some(host) = parsed_url.host_str() {
-        let google_api_url = format!("https://www.google.com/s2/favicons?domain={}&sz=128", host);
-        let google_bytes = client
-            .get(&google_api_url)
-            .send()
-            .ok()
-            .and_then(|r| {
-                if r.status().is_success() {
-                    r.bytes().ok()
-                } else {
-                    None
-                }
-            })
-            .map(|b| b.to_vec());
-
-        if google_bytes.is_some() {
-            return google_bytes;
-        }
-    }
-
-    None
+    let host = parsed_url.host_str()?;
+    let google_api_url = format!("https://www.google.com/s2/favicons?domain={host}&sz=128");
+    fetch_icon(&client, &google_api_url)
 }
 
 pub fn save_icon(
@@ -241,9 +218,12 @@ pub fn cleanup_app_icons(slug: &str, keep: Option<&Path>, share_dir: &Path, dry_
 }
 
 pub fn detect_format(bytes: &[u8]) -> Option<ImageFormat> {
-    if bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
+    if bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
         Some(ImageFormat::Png)
-    } else if bytes.starts_with(b"<svg") || bytes.starts_with(b"<?xml") {
+    } else if std::str::from_utf8(bytes).is_ok_and(|text| {
+        let text = text.trim_start_matches(|c: char| c.is_whitespace() || c == '\u{feff}');
+        text.starts_with("<svg") || (text.starts_with("<?xml") && text.contains("<svg"))
+    }) {
         Some(ImageFormat::Svg)
     } else if ico::is_ico(bytes) {
         Some(ImageFormat::Ico)
