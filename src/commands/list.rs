@@ -4,62 +4,90 @@ use std::path::Path;
 use crate::manifest::{get_manifest_path, load_manifest};
 use crate::output;
 
-pub fn list_apps(share_dir: &Path) -> Result<(), Box<dyn Error>> {
-    let manifest_path = get_manifest_path(share_dir);
-    let entries = load_manifest(&manifest_path)?;
-
+pub fn list_apps(
+    share_dir: &Path,
+    query: Option<&str>,
+    json: bool,
+    names: bool,
+) -> Result<(), Box<dyn Error>> {
+    let mut entries = load_manifest(&get_manifest_path(share_dir))?;
+    let total = entries.len();
+    if let Some(query) = query {
+        let query = query.to_lowercase();
+        entries.retain(|entry| {
+            entry.name.to_lowercase().contains(&query)
+                || entry.url.to_lowercase().contains(&query)
+                || entry.slug.contains(&query)
+        });
+    }
+    if json {
+        println!("{}", serde_json::to_string_pretty(&entries)?);
+        return Ok(());
+    }
+    if names {
+        for entry in &entries {
+            println!("{}", entry.name);
+        }
+        return Ok(());
+    }
     if entries.is_empty() {
-        output::info("No apps installed yet.");
+        output::info(if query.is_some() {
+            "No apps match your search."
+        } else {
+            "No apps installed yet."
+        });
         return Ok(());
     }
 
-    // Calculate column widths
     let name_width = entries
         .iter()
-        .map(|e| e.name.len())
+        .map(|e| e.name.chars().count())
         .max()
         .unwrap_or(4)
-        .max(4);
+        .clamp(4, 24);
     let url_width = entries
         .iter()
-        .map(|e| e.url.len())
+        .map(|e| e.url.chars().count())
         .max()
         .unwrap_or(3)
-        .max(3);
-    let browser_width = entries
-        .iter()
-        .map(|e| e.browser.len())
-        .max()
-        .unwrap_or(7)
-        .max(7);
-    let icon_width = entries
-        .iter()
-        .map(|e| e.icon_path.len())
-        .max()
-        .unwrap_or(4)
-        .max(4);
-
-    // Header
+        .clamp(3, 48);
+    output::info(&format!("{:<name_width$}  {:<url_width$}", "Name", "URL"));
     output::info(&format!(
-        "{:<name_width$}  {:<url_width$}  {:<browser_width$}  {:<icon_width$}",
-        "Name", "URL", "Browser", "Icon",
-    ));
-    output::info(&format!(
-        "{:<name_width$}  {:<url_width$}  {:<browser_width$}  {:<icon_width$}",
+        "{}  {}",
         "─".repeat(name_width),
-        "─".repeat(url_width),
-        "─".repeat(browser_width),
-        "─".repeat(icon_width),
+        "─".repeat(url_width)
     ));
-
-    // Rows
     for entry in &entries {
         output::info(&format!(
-            "{:<name_width$}  {:<url_width$}  {:<browser_width$}  {:<icon_width$}",
-            entry.name, entry.url, entry.browser, entry.icon_path,
+            "{:<name_width$}  {:<url_width$}",
+            cell(&entry.name, name_width),
+            cell(&entry.url, url_width),
+        ));
+        output::verbose(&format!(
+            "Name: {}\n  Slug: {}\n  URL: {}\n  Browser: {}\n  Icon: {}",
+            entry.name.escape_debug(),
+            entry.slug.escape_debug(),
+            entry.url.escape_debug(),
+            entry.browser.escape_debug(),
+            entry.icon_path.escape_debug(),
         ));
     }
-
-    output::info(&format!("\n{} app(s) installed.", entries.len()));
+    if query.is_some() {
+        output::info(&format!("\n{} of {} app(s) match.", entries.len(), total));
+    } else {
+        output::info(&format!("\n{} app(s) installed.", total));
+    }
     Ok(())
+}
+
+fn cell(value: &str, width: usize) -> String {
+    let value: String = value
+        .chars()
+        .map(|c| if c.is_control() { '�' } else { c })
+        .collect();
+    if value.chars().count() <= width {
+        value
+    } else {
+        format!("{}…", value.chars().take(width - 1).collect::<String>())
+    }
 }

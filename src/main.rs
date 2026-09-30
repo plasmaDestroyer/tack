@@ -55,7 +55,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     output::set_output_mode(mode);
 
     match args.subcommand() {
-        Some(("list", _)) => list_apps(&get_share_dir()?)?,
+        Some(("list", command)) => list_apps(
+            &get_share_dir()?,
+            command.get_one::<String>("query").map(String::as_str),
+            command.get_flag("json"),
+            command.get_flag("names"),
+        )?,
         Some(("remove", command)) => {
             remove_app(command.get_one::<String>("name").unwrap(), dry_run)?;
         }

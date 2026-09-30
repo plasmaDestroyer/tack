@@ -13,7 +13,7 @@ It auto-detects Chromium-based browsers on your `PATH` and opens sites with the 
 ```bash
 tack <url> <name> [--force] [--icon PATH] [--browser BROWSER] [--dry-run] [--quiet] [--verbose]
 tack -i                           # interactive mode
-tack list
+tack list [query] [--json | --names]
 tack open <name>
 tack update <name> [--name NAME] [--url URL] [--browser BROWSER] [--icon PATH] [--dry-run]
 tack update --all
@@ -83,6 +83,8 @@ To list all applications currently installed and managed by `tack`:
 ```bash
 tack list
 ```
+
+Search by name, URL, or stable slug with `tack list music`. Default output keeps long rows compact; `tack list --verbose` shows full paths and metadata. Use `tack list --json` for scripts or `tack list --names` for one name per line.
 
 ### Open an App
 

@@ -74,7 +74,28 @@ pub fn build_cli() -> Command {
                 .help("Run in interactive mode")
                 .action(clap::ArgAction::SetTrue),
         )
-        .subcommand(Command::new("list").about("List installed apps"))
+        .subcommand(
+            Command::new("list")
+                .about("List or search installed apps")
+                .arg(
+                    Arg::new("query")
+                        .help("Filter by name, URL, or stable slug")
+                        .index(1),
+                )
+                .arg(
+                    Arg::new("json")
+                        .long("json")
+                        .help("Print complete app metadata as JSON")
+                        .conflicts_with("names")
+                        .action(clap::ArgAction::SetTrue),
+                )
+                .arg(
+                    Arg::new("names")
+                        .long("names")
+                        .help("Print one app name per line")
+                        .action(clap::ArgAction::SetTrue),
+                ),
+        )
         .subcommand(
             Command::new("open")
                 .about("Open an installed app")

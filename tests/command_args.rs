@@ -38,7 +38,7 @@ fn subcommands_reject_extra_arguments_without_changing_apps() {
     for args in [
         vec!["-i", "list"],
         vec!["--force", "list"],
-        vec!["list", "extra"],
+        vec!["list", "query", "extra"],
         vec!["open", "Demo", "extra"],
         vec!["remove", "Demo", "extra"],
         vec!["update", "--all", "--name", "Oops"],
