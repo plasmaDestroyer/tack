@@ -33,9 +33,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             )
             .exit();
     }
-    if args.subcommand().is_some()
-        && (args.get_one::<String>("url").is_some() || args.get_flag("interactive"))
-    {
+    if args.subcommand().is_some() && (args.contains_id("app") || args.get_flag("interactive")) {
         build_cli()
             .error(
                 clap::error::ErrorKind::ArgumentConflict,
@@ -102,10 +100,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         Some(("manpage", _)) => generate_manpage()?,
         None => {
-            if let Some(url) = args.get_one::<String>("url") {
+            if let Some(mut app) = args.get_many::<String>("app") {
                 install_app(
-                    url,
-                    args.get_one::<String>("name").unwrap(),
+                    app.next().unwrap(),
+                    app.next().unwrap(),
                     args.get_flag("force"),
                     args.get_one::<String>("icon")
                         .cloned()

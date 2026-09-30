@@ -15,35 +15,30 @@ pub fn build_cli() -> Command {
         )
         .version(env!("CARGO_PKG_VERSION"))
         .arg(
-            Arg::new("url")
-                .help("URL to install")
+            Arg::new("app")
+                .help("URL and name for the app to install")
                 .index(1)
-                .requires("name"),
-        )
-        .arg(
-            Arg::new("name")
-                .help("Name for the app")
-                .index(2)
-                .requires("url"),
+                .num_args(2)
+                .value_names(["URL", "NAME"]),
         )
         .arg(
             Arg::new("force")
                 .long("force")
-                .requires("url")
+                .requires("app")
                 .help("Overwrite an existing app")
                 .action(clap::ArgAction::SetTrue),
         )
         .arg(
             Arg::new("icon")
                 .long("icon")
-                .requires("url")
+                .requires("app")
                 .value_name("PATH")
                 .help("Use a custom local icon instead of fetching"),
         )
         .arg(
             Arg::new("browser")
                 .long("browser")
-                .requires("url")
+                .requires("app")
                 .value_name("BROWSER")
                 .help("Browser to use (e.g. chromium, brave-browser)"),
         )
@@ -75,7 +70,7 @@ pub fn build_cli() -> Command {
             Arg::new("interactive")
                 .long("interactive")
                 .short('i')
-                .conflicts_with_all(["url", "name", "force", "icon", "browser"])
+                .conflicts_with_all(["app", "force", "icon", "browser"])
                 .help("Run in interactive mode")
                 .action(clap::ArgAction::SetTrue),
         )
@@ -216,7 +211,20 @@ mod tests {
         let args = build_cli()
             .try_get_matches_from(["tack", "https://example.com", "--", "--quiet"])
             .unwrap();
-        assert_eq!(args.get_one::<String>("name").unwrap(), "--quiet");
+        assert_eq!(
+            args.get_many::<String>("app").unwrap().next_back().unwrap(),
+            "--quiet"
+        );
         assert!(!args.get_flag("quiet"));
+        for name in ["list", "open", "help", "config"] {
+            let args = build_cli()
+                .try_get_matches_from(["tack", "https://example.com", name])
+                .unwrap();
+            assert!(args.subcommand().is_none());
+            assert_eq!(
+                args.get_many::<String>("app").unwrap().next_back().unwrap(),
+                name
+            );
+        }
     }
 }
