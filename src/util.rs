@@ -1,6 +1,44 @@
 use std::error::Error;
+use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), Box<dyn Error>> {
+    let target = match std::fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() => path.canonicalize()?,
+        Ok(_) => path.to_path_buf(),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => path.to_path_buf(),
+        Err(error) => return Err(error.into()),
+    };
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let temporary = target.with_extension(format!(
+        "tmp-{}-{}",
+        std::process::id(),
+        SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
+    ));
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary)?;
+    let result = (|| {
+        match target.metadata() {
+            Ok(metadata) => file.set_permissions(metadata.permissions())?,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        std::fs::rename(&temporary, &target)
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temporary);
+    }
+    result?;
+    Ok(())
+}
 
 pub fn get_share_dir() -> Result<PathBuf, Box<dyn Error>> {
     if let Ok(home_directory) = std::env::var("XDG_DATA_HOME") {
@@ -159,4 +197,40 @@ pub fn resolve_app_browser(name: &str) -> Result<String, String> {
     })?;
     validate_app_browser(&browser)?;
     Ok(browser)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn atomic_writes_keep_permissions_symlinks_and_clean_failed_files() {
+        let root = std::env::temp_dir().join(format!(
+            "tack-atomic-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let target = root.join("config.toml");
+        std::fs::write(&target, b"old").unwrap();
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let link = root.join("config-link.toml");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        atomic_write(&link, b"new").unwrap();
+        assert_eq!(std::fs::read(&target).unwrap(), b"new");
+        assert!(link.symlink_metadata().unwrap().file_type().is_symlink());
+        assert_eq!(
+            target.metadata().unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        let blocked = root.join("blocked");
+        std::fs::create_dir(&blocked).unwrap();
+        assert!(atomic_write(&blocked, b"data").is_err());
+        assert!(blocked.is_dir());
+        assert_eq!(std::fs::read_dir(&root).unwrap().count(), 3);
+        std::fs::remove_dir_all(root).unwrap();
+    }
 }

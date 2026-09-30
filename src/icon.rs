@@ -216,8 +216,7 @@ pub fn save_icon(
         return Ok(icon_path);
     }
 
-    std::fs::create_dir_all(&icons_dir)?;
-    std::fs::write(&icon_path, &final_bytes)?;
+    crate::util::atomic_write(&icon_path, &final_bytes)?;
     Ok(icon_path)
 }
 

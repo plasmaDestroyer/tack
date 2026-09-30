@@ -1,13 +1,11 @@
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fs::File;
-use std::io::Write;
 use std::os::fd::AsRawFd;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::output;
-use crate::util::slugify;
+use crate::util::{atomic_write, slugify};
 
 #[derive(Serialize, Deserialize)]
 pub struct AppEntry {
@@ -64,30 +62,7 @@ pub fn save_manifest(
         output::dry_run(&format!("would update manifest: {}", path.display()));
         return Ok(());
     }
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    let json = serde_json::to_vec_pretty(entries)?;
-    let temporary = path.with_extension(format!(
-        "json.tmp-{}-{}",
-        std::process::id(),
-        SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
-    ));
-    let mut file = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&temporary)?;
-    let result = (|| {
-        file.write_all(&json)?;
-        file.sync_all()?;
-        std::fs::rename(&temporary, path)?;
-        Ok::<(), std::io::Error>(())
-    })();
-    if result.is_err() {
-        let _ = std::fs::remove_file(&temporary);
-    }
-    result?;
-    Ok(())
+    atomic_write(path, &serde_json::to_vec_pretty(entries)?)
 }
 
 pub fn add_or_update_app(
@@ -108,6 +83,7 @@ pub fn add_or_update_app(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn manifest_write_replaces_file_and_cleans_failed_temporary_file() {

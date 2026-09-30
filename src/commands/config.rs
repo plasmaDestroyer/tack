@@ -2,7 +2,7 @@ use std::error::Error;
 
 use crate::config::{get_config_path, load_config};
 use crate::output;
-use crate::util::validate_app_browser;
+use crate::util::{atomic_write, validate_app_browser};
 
 pub fn show_config() -> Result<(), Box<dyn Error>> {
     let config = load_config();
@@ -44,10 +44,6 @@ pub fn set_config(key: &str, value: &str, dry_run: bool) -> Result<(), Box<dyn E
     if config_path.exists() {
         let contents = std::fs::read_to_string(&config_path)?;
         lines = contents.lines().map(|s| s.to_string()).collect();
-    } else {
-        if let Some(parent) = config_path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
     }
 
     // Check if key exists
@@ -70,7 +66,7 @@ pub fn set_config(key: &str, value: &str, dry_run: bool) -> Result<(), Box<dyn E
         lines.push(format!("{} = \"{}\"", key, value));
     }
 
-    std::fs::write(&config_path, lines.join("\n") + "\n")?;
+    atomic_write(&config_path, (lines.join("\n") + "\n").as_bytes())?;
     output::success("Config updated successfully.");
     Ok(())
 }

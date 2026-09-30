@@ -1,7 +1,10 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
-use crate::{output, util::validate_app_browser};
+use crate::{
+    output,
+    util::{atomic_write, validate_app_browser},
+};
 
 fn desktop_value(value: &str) -> String {
     value
@@ -39,10 +42,6 @@ pub fn create_desktop_file(
     dry_run: bool,
 ) -> Result<(), Box<dyn Error>> {
     validate_app_browser(browser)?;
-    let applications_dir = &desktop_file_path
-        .parent()
-        .ok_or("Invalid desktop file path")?;
-
     let exec_args = format!(
         "{} {}",
         exec_arg(browser),
@@ -76,8 +75,7 @@ Categories={};",
         return Ok(());
     }
 
-    std::fs::create_dir_all(applications_dir)?;
-    std::fs::write(desktop_file_path, contents)?;
+    atomic_write(desktop_file_path, contents.as_bytes())?;
 
     Ok(())
 }

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::icon::detect_format;
 use crate::manifest::{AppEntry, get_manifest_path, load_manifest};
 use crate::output;
-use crate::util::get_share_dir;
+use crate::util::{atomic_write, get_share_dir};
 
 #[derive(Serialize, Deserialize)]
 pub struct BackupEntry {
@@ -55,7 +55,7 @@ pub fn export_apps(
         if dry_run {
             output::dry_run(&format!("would export manifest to {}", path));
         } else {
-            fs::write(path, &json)?;
+            atomic_write(std::path::Path::new(path), json.as_bytes())?;
             output::success(&format!("Exported manifest to {}", path));
         }
     } else {
