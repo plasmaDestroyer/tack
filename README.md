@@ -18,7 +18,7 @@ tack open <name>
 tack update <name> [--name NAME] [--url URL] [--browser BROWSER] [--icon PATH] [--dry-run]
 tack update --all
 tack remove <name> [--dry-run]
-tack export [file]
+tack export [file] [--no-icons]
 tack import <file>
 tack completions <bash|zsh|fish>
 tack manpage
@@ -110,7 +110,7 @@ tack update --all
 
 ### Export and Import
 
-You can export your installed app metadata as JSON and recreate the apps on another machine:
+You can export your installed apps and icons as JSON and recreate the apps on another machine:
 
 ```bash
 # Dump JSON to stdout
@@ -123,7 +123,9 @@ tack export backup.json
 tack import backup.json
 ```
 
-The JSON does not contain icon files. Import re-fetches icons or uses cached ones, so keep a separate copy of any custom icons you want to preserve.
+Icons are embedded as JSON byte arrays, including custom icons. Import restores them into the new machine's data directory and preserves custom icons during later repairs. Browser executables must be available on the destination.
+
+Older metadata-only backups still work; import re-fetches icons or uses cached ones when no image is embedded. Use `tack export backup.json --no-icons` for a smaller metadata-only backup. Export fails if a custom icon cannot be read, so it cannot silently lose your image.
 
 ### Remove an App
 

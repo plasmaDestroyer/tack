@@ -120,9 +120,16 @@ pub fn build_cli() -> Command {
         )
         .subcommand(
             Command::new("export")
-                .about("Export manifest as JSON")
+                .about("Export apps and icons as JSON")
                 .long_about(
-                    "Dump app metadata as JSON to stdout or a file. Icons are not included.",
+                    "Back up app metadata and available icons as JSON to stdout or a file. \
+                     Use --no-icons for a metadata-only export.",
+                )
+                .arg(
+                    Arg::new("no-icons")
+                        .long("no-icons")
+                        .help("Export metadata without icon files")
+                        .action(clap::ArgAction::SetTrue),
                 )
                 .arg(
                     Arg::new("file")
@@ -134,8 +141,8 @@ pub fn build_cli() -> Command {
             Command::new("import")
                 .about("Import apps from JSON file")
                 .long_about(
-                    "Restore from an exported JSON file, re-fetch icons and \
-                     recreate .desktop files for each entry.",
+                    "Restore apps and embedded icons from an exported JSON file. \
+                     Older metadata-only backups remain supported; missing icons are re-fetched.",
                 )
                 .arg(Arg::new("file").required(true).index(1)),
         )

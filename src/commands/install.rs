@@ -16,7 +16,11 @@ use crate::util::{
 
 pub enum IconSource {
     File(String),
-    Fetched(Vec<u8>, ImageFormat),
+    Bytes {
+        bytes: Vec<u8>,
+        format: ImageFormat,
+        user_supplied: bool,
+    },
     Default,
 }
 
@@ -116,7 +120,12 @@ pub fn install_app(
                 return Err(format!("Icon file not found: {}", icon_path_str).into());
             }
         }
-        Some(IconSource::Fetched(bytes, format)) => {
+        Some(IconSource::Bytes {
+            bytes,
+            format,
+            user_supplied,
+        }) => {
+            user_supplied_icon = user_supplied;
             save_icon(&slug, &bytes, format, &share_dir, dry_run)?
         }
         Some(IconSource::Default) => {

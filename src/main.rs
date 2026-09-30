@@ -78,6 +78,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Some(("export", command)) => {
             export_apps(
                 command.get_one::<String>("file").map(String::as_str),
+                !command.get_flag("no-icons"),
                 dry_run,
             )?;
         }
@@ -226,7 +227,11 @@ fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
 
     let icon_arg =
         if fetched_num.is_some() && (icon_choice.trim().is_empty() || icon_choice.trim() == "1") {
-            fetched.map(|(bytes, format)| IconSource::Fetched(bytes, format))
+            fetched.map(|(bytes, format)| IconSource::Bytes {
+                bytes,
+                format,
+                user_supplied: false,
+            })
         } else if icon_choice.trim() == custom_num.to_string() {
             let path = prompt("Enter the icon file path");
             if path.is_empty() {
