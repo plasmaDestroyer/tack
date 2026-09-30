@@ -41,7 +41,7 @@ pub fn install_app(
     let share_dir = get_share_dir()?;
     let slug = slugify(name);
 
-    let desktop_file_path = get_desktop_file_path(&slug, &share_dir);
+    let desktop_file_path = get_desktop_file_path(&slug, &share_dir)?;
     if !force && desktop_file_path.exists() {
         return Err(format!(
             "{} is already installed. Use `tack update {}` to modify it.",

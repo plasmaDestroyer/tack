@@ -214,7 +214,7 @@ fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
         let name = prompt("Enter the app name")?;
         if let Err(message) = validate_name(&name) {
             output::warn(&message);
-        } else if get_desktop_file_path(&slugify(&name), &share_dir).exists()
+        } else if get_desktop_file_path(&slugify(&name), &share_dir)?.exists()
             || manifest::find_app_index(&entries, &name).is_some()
         {
             output::warn("That app is already installed. Choose another name or use tack update.");

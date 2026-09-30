@@ -29,7 +29,7 @@ pub fn remove_app(name: &str, dry_run: bool) -> Result<(), Box<dyn Error>> {
     };
 
     // Delete .desktop file
-    let desktop_file_path = get_desktop_file_path(&entry.slug, &share_dir);
+    let desktop_file_path = get_desktop_file_path(&entry.slug, &share_dir)?;
     if desktop_file_path.exists() {
         if dry_run {
             output::dry_run(&format!("would remove: {}", desktop_file_path.display()));

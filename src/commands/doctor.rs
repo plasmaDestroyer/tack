@@ -4,7 +4,7 @@ use crate::desktop::get_desktop_file_path;
 use crate::icon::detect_format;
 use crate::manifest::{find_app_index, get_manifest_path, load_manifest};
 use crate::output;
-use crate::util::{get_share_dir, resolve_app_browser, slugify, validate_url};
+use crate::util::{get_share_dir, resolve_app_browser, validate_slug, validate_url};
 
 pub fn doctor_apps(name: Option<&str>) -> Result<(), Box<dyn Error>> {
     let share_dir = get_share_dir()?;
@@ -22,7 +22,7 @@ pub fn doctor_apps(name: Option<&str>) -> Result<(), Box<dyn Error>> {
     let mut failed = 0;
     for entry in &entries {
         let mut issues = Vec::new();
-        let safe_slug = !entry.slug.is_empty() && slugify(&entry.slug) == entry.slug;
+        let safe_slug = validate_slug(&entry.slug).is_ok();
         if !safe_slug {
             issues.push("Invalid stored slug; restore this app from a backup.".to_string());
         }
@@ -41,7 +41,7 @@ pub fn doctor_apps(name: Option<&str>) -> Result<(), Box<dyn Error>> {
                 ));
             }
         }
-        if safe_slug && !get_desktop_file_path(&entry.slug, &share_dir).is_file() {
+        if safe_slug && !get_desktop_file_path(&entry.slug, &share_dir)?.is_file() {
             issues.push(format!(
                 "Launcher is missing. Repair with: tack update {}",
                 entry.slug

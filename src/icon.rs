@@ -195,6 +195,7 @@ pub fn save_icon(
     share_dir: &Path,
     dry_run: bool,
 ) -> Result<PathBuf, Box<dyn Error>> {
+    crate::util::validate_slug(slug)?;
     let icons_dir = share_dir.join("icons");
 
     // If the source is ICO, convert to PNG first.
@@ -219,7 +220,7 @@ pub fn save_icon(
 }
 
 pub fn cleanup_app_icons(slug: &str, keep: Option<&Path>, share_dir: &Path, dry_run: bool) {
-    if slug.is_empty() || crate::util::slugify(slug) != slug {
+    if crate::util::validate_slug(slug).is_err() {
         return;
     }
     for extension in ["png", "svg"] {

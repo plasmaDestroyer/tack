@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::{
     output,
-    util::{atomic_write, validate_app_browser},
+    util::{atomic_write, validate_app_browser, validate_slug},
 };
 
 fn desktop_value(value: &str) -> String {
@@ -26,10 +26,11 @@ fn exec_arg(value: &str) -> String {
     )
 }
 
-pub fn get_desktop_file_path(slug: &str, share_dir: &Path) -> PathBuf {
-    share_dir
+pub fn get_desktop_file_path(slug: &str, share_dir: &Path) -> Result<PathBuf, String> {
+    validate_slug(slug)?;
+    Ok(share_dir
         .join("applications")
-        .join(format!("{}.desktop", slug))
+        .join(format!("{}.desktop", slug)))
 }
 
 pub fn create_desktop_file(

@@ -124,7 +124,7 @@ pub fn update_app(
 
     // Rewrite .desktop file
     let config = crate::config::load_config();
-    let desktop_file_path = get_desktop_file_path(&slug, &share_dir);
+    let desktop_file_path = get_desktop_file_path(&slug, &share_dir)?;
     let icon_path = PathBuf::from(&entry.icon_path);
     create_desktop_file(
         &entry.name,

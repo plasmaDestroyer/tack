@@ -69,6 +69,17 @@ pub fn validate_name(name: &str) -> Result<(), String> {
     }
 }
 
+pub fn validate_slug(slug: &str) -> Result<(), String> {
+    if slug.is_empty() || slugify(slug) != slug {
+        Err(format!(
+            "Invalid stored app slug '{}'. Restore this app from a backup.",
+            slug.escape_debug()
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 pub fn normalize_url(url: &str) -> String {
     if url.split_once("://").is_some_and(|(scheme, _)| {
         !scheme.is_empty()
