@@ -15,6 +15,7 @@ tack <url> <name> [--force] [--icon PATH] [--browser BROWSER] [--dry-run] [--qui
 tack -i                           # interactive mode
 tack list [query] [--json | --names]
 tack open <name>
+tack doctor [name]
 tack update <name> [--name NAME] [--url URL] [--browser BROWSER] [--icon PATH] [--dry-run]
 tack update --all
 tack remove <name> [--dry-run]
@@ -93,6 +94,10 @@ To launch a previously installed application from the terminal:
 ```bash
 tack open YouTube
 ```
+
+### Check App Health
+
+Run `tack doctor` to check all apps, or `tack doctor YouTube` for one. It checks saved URLs, browser executables, launcher presence, and readable icon formats. Problems include suggested repair commands and return a nonzero exit status. Checks perform no network requests or writes.
 
 ### Update an App
 

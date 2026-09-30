@@ -102,6 +102,15 @@ pub fn build_cli() -> Command {
                 .arg(Arg::new("name").required(true).index(1)),
         )
         .subcommand(
+            Command::new("doctor")
+                .about("Check saved URLs, browsers, and launcher/icon files")
+                .arg(
+                    Arg::new("name")
+                        .help("Check one app (default: all)")
+                        .index(1),
+                ),
+        )
+        .subcommand(
             Command::new("remove")
                 .about("Remove an installed app")
                 .arg(Arg::new("name").required(true).index(1)),

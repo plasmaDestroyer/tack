@@ -1,5 +1,6 @@
 pub mod completions;
 pub mod config;
+pub mod doctor;
 pub mod export;
 pub mod import;
 pub mod install;

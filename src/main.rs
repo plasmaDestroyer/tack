@@ -12,6 +12,7 @@ use std::io::{self, Write};
 
 use commands::completions::{build_cli, generate_completions, generate_manpage};
 use commands::config::{set_config, show_config};
+use commands::doctor::doctor_apps;
 use commands::export::export_apps;
 use commands::import::import_apps;
 use commands::install::{IconSource, install_app};
@@ -55,6 +56,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     output::set_output_mode(mode);
 
     match args.subcommand() {
+        Some(("doctor", command)) => {
+            doctor_apps(command.get_one::<String>("name").map(String::as_str))?
+        }
         Some(("list", command)) => list_apps(
             &get_share_dir()?,
             command.get_one::<String>("query").map(String::as_str),
