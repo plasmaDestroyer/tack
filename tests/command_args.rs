@@ -36,6 +36,8 @@ fn subcommands_reject_extra_arguments_without_changing_apps() {
     let before = std::fs::read(&manifest).unwrap();
     let backup = root.join("backup.json");
     for args in [
+        vec!["-i", "list"],
+        vec!["--force", "list"],
         vec!["list", "extra"],
         vec!["open", "Demo", "extra"],
         vec!["remove", "Demo", "extra"],

@@ -6,9 +6,7 @@ use clap_complete::{Shell, generate};
 
 use crate::output;
 
-/// Build a clap `Command` that mirrors tack's CLI surface.
-/// This is used for shell-completion and man-page generation —
-/// actual argument parsing stays hand-rolled in main.rs.
+/// Shared CLI definition for parsing, help, completions, and man pages.
 pub fn build_cli() -> Command {
     Command::new("tack")
         .about("Install any website as a desktop app on Linux")
@@ -18,24 +16,36 @@ pub fn build_cli() -> Command {
              installed apps in a manifest.",
         )
         .version(env!("CARGO_PKG_VERSION"))
-        .subcommand_required(false)
-        .arg(Arg::new("url").help("URL to install").index(1))
-        .arg(Arg::new("name").help("Name for the app").index(2))
+        .arg(
+            Arg::new("url")
+                .help("URL to install")
+                .index(1)
+                .requires("name"),
+        )
+        .arg(
+            Arg::new("name")
+                .help("Name for the app")
+                .index(2)
+                .requires("url"),
+        )
         .arg(
             Arg::new("force")
                 .long("force")
+                .requires("url")
                 .help("Overwrite an existing app")
                 .action(clap::ArgAction::SetTrue),
         )
         .arg(
             Arg::new("icon")
                 .long("icon")
+                .requires("url")
                 .value_name("PATH")
                 .help("Use a custom local icon instead of fetching"),
         )
         .arg(
             Arg::new("browser")
                 .long("browser")
+                .requires("url")
                 .value_name("BROWSER")
                 .help("Browser to use (e.g. chromium, brave-browser)"),
         )
@@ -50,6 +60,7 @@ pub fn build_cli() -> Command {
             Arg::new("quiet")
                 .long("quiet")
                 .short('q')
+                .conflicts_with("verbose")
                 .global(true)
                 .help("Suppress non-error output")
                 .action(clap::ArgAction::SetTrue),
@@ -66,6 +77,7 @@ pub fn build_cli() -> Command {
             Arg::new("interactive")
                 .long("interactive")
                 .short('i')
+                .conflicts_with_all(["url", "name", "force", "icon", "browser"])
                 .help("Run in interactive mode")
                 .action(clap::ArgAction::SetTrue),
         )
@@ -88,10 +100,16 @@ pub fn build_cli() -> Command {
                      With --all, re-fetch favicons and rewrite .desktop files \
                      for every installed app.",
                 )
-                .arg(Arg::new("name").index(1))
+                .arg(
+                    Arg::new("name")
+                        .index(1)
+                        .required_unless_present("all")
+                        .conflicts_with("all"),
+                )
                 .arg(
                     Arg::new("all")
                         .long("all")
+                        .conflicts_with_all(["new-name", "url", "browser", "icon"])
                         .help("Update all installed apps")
                         .action(clap::ArgAction::SetTrue),
                 )
@@ -124,11 +142,17 @@ pub fn build_cli() -> Command {
         .subcommand(
             Command::new("config")
                 .about("Manage tack configuration")
+                .subcommand_required(true)
                 .subcommand(Command::new("show").about("Show current config"))
                 .subcommand(
                     Command::new("set")
                         .about("Set a config value")
-                        .arg(Arg::new("key").required(true).index(1))
+                        .arg(
+                            Arg::new("key")
+                                .required(true)
+                                .index(1)
+                                .value_parser(["browser", "categories"]),
+                        )
                         .arg(Arg::new("value").required(true).index(2)),
                 ),
         )
@@ -145,16 +169,11 @@ pub fn build_cli() -> Command {
         .subcommand(Command::new("manpage").about("Generate man page and print to stdout"))
 }
 
-pub fn generate_completions(shell_name: &str) -> Result<(), Box<dyn Error>> {
-    let shell: Shell = shell_name
-        .parse()
-        .map_err(|_| format!("Unsupported shell: {}. Use bash, zsh, or fish.", shell_name))?;
-
+pub fn generate_completions(shell: Shell) {
     let mut cmd = build_cli();
     generate(shell, &mut cmd, "tack", &mut io::stdout());
 
-    output::verbose(&format!("Generated {} completions.", shell_name));
-    Ok(())
+    output::verbose(&format!("Generated {} completions.", shell));
 }
 
 pub fn generate_manpage() -> Result<(), Box<dyn Error>> {
@@ -162,4 +181,33 @@ pub fn generate_manpage() -> Result<(), Box<dyn Error>> {
     let man = clap_mangen::Man::new(cmd);
     man.render(&mut io::stdout())?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cli_enforces_command_requirements_and_keeps_literal_values() {
+        build_cli().debug_assert();
+        for args in [
+            vec!["tack", "https://example.com"],
+            vec!["tack", "--icon", "icon.png"],
+            vec!["tack", "-i", "https://example.com", "Demo"],
+            vec!["tack", "-q", "--verbose", "list"],
+            vec!["tack", "--quiet", "-v", "list"],
+            vec!["tack", "update"],
+            vec!["tack", "update", "Demo", "--all"],
+            vec!["tack", "update", "--all", "--icon", "icon.png"],
+            vec!["tack", "config"],
+            vec!["tack", "config", "set", "typo", "value"],
+        ] {
+            assert!(build_cli().try_get_matches_from(&args).is_err(), "{args:?}");
+        }
+        let args = build_cli()
+            .try_get_matches_from(["tack", "https://example.com", "--", "--quiet"])
+            .unwrap();
+        assert_eq!(args.get_one::<String>("name").unwrap(), "--quiet");
+        assert!(!args.get_flag("quiet"));
+    }
 }

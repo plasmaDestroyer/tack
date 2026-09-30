@@ -10,225 +10,103 @@ mod util;
 use std::error::Error;
 use std::io::{self, Write};
 
-use commands::completions::{generate_completions, generate_manpage};
-use commands::config::handle_config;
+use commands::completions::{build_cli, generate_completions, generate_manpage};
+use commands::config::{set_config, show_config};
 use commands::export::export_apps;
 use commands::import::import_apps;
 use commands::install::{IconSource, install_app};
 use commands::list::list_apps;
 use commands::open::open_app;
 use commands::remove::remove_app;
-use commands::update::{parse_update_flags, update_all_apps, update_app};
+use commands::update::{UpdateFlags, update_all_apps, update_app};
 use desktop::get_desktop_file_path;
 use output::OutputMode;
 use util::{detect_browsers, get_share_dir, normalize_url, slugify, validate_name, validate_url};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let args: Vec<String> = std::env::args().collect();
-
-    // ── Global flags (parsed before subcommand routing) ──
-    let mut dry_run = false;
-    let mut interactive = false;
-    let mut mode = OutputMode::Normal;
-
-    // Quick scan for global flags
-    for arg in &args[1..] {
-        match arg.as_str() {
-            "--version" | "-V" => {
-                println!("tack {}", env!("CARGO_PKG_VERSION"));
-                std::process::exit(0);
-            }
-            "--help" | "-h" => {
-                print_usage();
-                std::process::exit(0);
-            }
-            "--dry-run" => dry_run = true,
-            "--quiet" | "-q" => mode = OutputMode::Quiet,
-            "--verbose" | "-v" => mode = OutputMode::Verbose,
-            "-i" | "--interactive" => interactive = true,
-            _ => {}
-        }
+    let args = build_cli().get_matches();
+    if args.subcommand().is_some()
+        && (args.get_one::<String>("url").is_some() || args.get_flag("interactive"))
+    {
+        build_cli()
+            .error(
+                clap::error::ErrorKind::ArgumentConflict,
+                "Install and interactive arguments cannot be combined with subcommands.",
+            )
+            .exit();
     }
-
-    // Quiet and verbose are mutually exclusive
-    if args.contains(&"--quiet".to_string()) && args.contains(&"--verbose".to_string()) {
-        output::error("Cannot use --quiet and --verbose together.");
-        std::process::exit(1);
-    }
-
+    let dry_run = args.get_flag("dry-run");
+    let mode = if args.get_flag("quiet") {
+        OutputMode::Quiet
+    } else if args.get_flag("verbose") {
+        OutputMode::Verbose
+    } else {
+        OutputMode::Normal
+    };
     output::set_output_mode(mode);
 
-    let args: Vec<String> = args
-        .into_iter()
-        .filter(|arg| {
-            !matches!(
-                arg.as_str(),
-                "--dry-run" | "--quiet" | "-q" | "--verbose" | "-v"
-            )
-        })
-        .collect();
-
-    // ── Interactive mode (#19) ──
-    if interactive {
-        return run_interactive(dry_run);
-    }
-
-    if args.len() < 2 {
-        return run_interactive(dry_run);
-    }
-
-    match args[1].as_str() {
-        "help" => {
-            print_usage();
-            std::process::exit(0);
+    match args.subcommand() {
+        Some(("list", _)) => list_apps(&get_share_dir()?)?,
+        Some(("remove", command)) => {
+            remove_app(command.get_one::<String>("name").unwrap(), dry_run)?;
         }
-        "list" => {
-            if args.len() != 2 {
-                return Err("Usage: tack list".into());
-            }
-            let share_dir = get_share_dir()?;
-            list_apps(&share_dir)?;
+        Some(("open", command)) => {
+            open_app(command.get_one::<String>("name").unwrap(), dry_run)?;
         }
-        "remove" => {
-            if args.len() != 3 {
-                output::error("Usage: tack remove <name>");
-                std::process::exit(1);
-            }
-            remove_app(&args[2], dry_run)?;
-        }
-        "open" => {
-            if args.len() != 3 {
-                output::error("Usage: tack open <name>");
-                std::process::exit(1);
-            }
-            open_app(&args[2], dry_run)?;
-        }
-        "update" => {
-            if args.len() < 3 {
-                output::error(
-                    "Usage: tack update <name> [--name NAME] [--url URL] [--browser BROWSER] [--icon PATH]\n       tack update --all",
-                );
-                std::process::exit(1);
-            }
-            if args[2] == "--all" {
-                if args.len() != 3 {
-                    return Err("Usage: tack update --all".into());
-                }
+        Some(("update", command)) => {
+            if command.get_flag("all") {
                 update_all_apps(dry_run)?;
             } else {
-                let flags = parse_update_flags(&args[3..])?;
-                update_app(&args[2], flags, dry_run)?;
+                let flags = UpdateFlags {
+                    name: command.get_one::<String>("new-name").cloned(),
+                    url: command.get_one::<String>("url").cloned(),
+                    browser: command.get_one::<String>("browser").cloned(),
+                    icon: command.get_one::<String>("icon").cloned(),
+                };
+                update_app(command.get_one::<String>("name").unwrap(), flags, dry_run)?;
             }
         }
-        "config" => {
-            handle_config(&args[2..], dry_run)?;
-        }
-        "export" => {
-            if args.len() > 3 || args.get(2).is_some_and(|arg| arg.starts_with('-')) {
-                return Err("Usage: tack export [file]".into());
-            }
-            let output_path = args.get(2).map(String::as_str);
-            export_apps(output_path, dry_run)?;
-        }
-        "import" => {
-            if args.len() != 3 {
-                output::error("Usage: tack import <file>");
-                std::process::exit(1);
-            }
-            import_apps(&args[2], dry_run)?;
-        }
-        "completions" => {
-            if args.len() != 3 {
-                output::error("Usage: tack completions <bash|zsh|fish>");
-                std::process::exit(1);
-            }
-            generate_completions(&args[2])?;
-        }
-        "manpage" => {
-            if args.len() != 2 {
-                return Err("Usage: tack manpage".into());
-            }
-            generate_manpage()?;
-        }
-        _ => {
-            let force = args.contains(&"--force".to_string());
-            let mut icon_path = None;
-            let mut browser = None;
-            let mut positional = Vec::new();
-
-            let mut i = 1;
-            while i < args.len() {
-                match args[i].as_str() {
-                    "--force" | "--dry-run" | "--quiet" | "-q" | "--verbose" | "-v" => {
-                        // already handled or skip
-                    }
-                    "--icon" => {
-                        if i + 1 < args.len() {
-                            icon_path = Some(args[i + 1].clone());
-                            i += 1; // skip next
-                        } else {
-                            output::error("--icon requires a value");
-                            std::process::exit(1);
-                        }
-                    }
-                    "--browser" => {
-                        if i + 1 < args.len() {
-                            browser = Some(args[i + 1].clone());
-                            i += 1; // skip next
-                        } else {
-                            output::error("--browser requires a value");
-                            std::process::exit(1);
-                        }
-                    }
-                    unknown if unknown.starts_with('-') => {
-                        return Err(format!("Unknown flag: {unknown}").into());
-                    }
-                    _ => {
-                        positional.push(&args[i]);
-                    }
-                }
-                i += 1;
-            }
-
-            if positional.len() != 2 {
-                output::error(
-                    "Usage: tack <url> <name> [--force] [--icon PATH] [--browser BROWSER] [--dry-run] [--quiet] [--verbose]",
-                );
-                std::process::exit(1);
-            }
-            install_app(
-                positional[0],
-                positional[1],
-                force,
-                icon_path.map(IconSource::File),
-                browser,
+        Some(("config", command)) => match command.subcommand() {
+            Some(("show", _)) => show_config()?,
+            Some(("set", values)) => set_config(
+                values.get_one::<String>("key").unwrap(),
+                values.get_one::<String>("value").unwrap(),
+                dry_run,
+            )?,
+            _ => unreachable!("Clap requires a config subcommand"),
+        },
+        Some(("export", command)) => {
+            export_apps(
+                command.get_one::<String>("file").map(String::as_str),
                 dry_run,
             )?;
         }
+        Some(("import", command)) => {
+            import_apps(command.get_one::<String>("file").unwrap(), dry_run)?;
+        }
+        Some(("completions", command)) => {
+            generate_completions(*command.get_one::<clap_complete::Shell>("shell").unwrap());
+        }
+        Some(("manpage", _)) => generate_manpage()?,
+        None => {
+            if let Some(url) = args.get_one::<String>("url") {
+                install_app(
+                    url,
+                    args.get_one::<String>("name").unwrap(),
+                    args.get_flag("force"),
+                    args.get_one::<String>("icon")
+                        .cloned()
+                        .map(IconSource::File),
+                    args.get_one::<String>("browser").cloned(),
+                    dry_run,
+                )?;
+            } else {
+                run_interactive(dry_run)?;
+            }
+        }
+        _ => unreachable!("Clap validates subcommands"),
     }
-
     Ok(())
-}
-
-fn print_usage() {
-    eprintln!(
-        "Usage: tack <url> <name> [--force] [--icon PATH] [--browser BROWSER] [--dry-run] [--quiet] [--verbose]"
-    );
-    eprintln!("       tack -V, --version                (print version)");
-    eprintln!("       tack -i                           (interactive mode)");
-    eprintln!("       tack list");
-    eprintln!("       tack open <name>");
-    eprintln!("       tack remove <name> [--dry-run]");
-    eprintln!(
-        "       tack update <name> [--name NAME] [--url URL] [--browser BROWSER] [--icon PATH] [--dry-run]"
-    );
-    eprintln!("       tack update --all                 (update all apps)");
-    eprintln!("       tack export [file]");
-    eprintln!("       tack import <file>");
-    eprintln!("       tack completions <bash|zsh|fish>");
-    eprintln!("       tack manpage");
-    eprintln!("       tack config show");
-    eprintln!("       tack config set <key> <value>");
 }
 
 // ── Interactive mode (#19) ──────────────────────────────────────────

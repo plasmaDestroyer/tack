@@ -21,40 +21,6 @@ pub struct UpdateFlags {
     pub name: Option<String>,
 }
 
-pub fn parse_update_flags(args: &[String]) -> Result<UpdateFlags, Box<dyn Error>> {
-    let mut flags = UpdateFlags::default();
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--dry-run" | "--quiet" | "-q" | "--verbose" | "-v" => i += 1,
-            "--icon" => {
-                let val = args.get(i + 1).ok_or("--icon requires a value")?;
-                flags.icon = Some(val.clone());
-                i += 2;
-            }
-            "--url" => {
-                let val = args.get(i + 1).ok_or("--url requires a value")?;
-                flags.url = Some(val.clone());
-                i += 2;
-            }
-            "--browser" => {
-                let val = args.get(i + 1).ok_or("--browser requires a value")?;
-                flags.browser = Some(val.clone());
-                i += 2;
-            }
-            "--name" => {
-                let val = args.get(i + 1).ok_or("--name requires a value")?;
-                flags.name = Some(val.clone());
-                i += 2;
-            }
-            other => {
-                return Err(format!("Unknown flag: {}", other).into());
-            }
-        }
-    }
-    Ok(flags)
-}
-
 pub fn update_app(
     current_name: &str,
     flags: UpdateFlags,

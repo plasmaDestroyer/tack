@@ -31,7 +31,7 @@ fn install_rejects_unknown_flags_and_extra_arguments() {
 
     let typo = run(&["--dry-rnu"]);
     assert!(!typo.status.success());
-    assert!(String::from_utf8_lossy(&typo.stderr).contains("Unknown flag: --dry-rnu"));
+    assert!(String::from_utf8_lossy(&typo.stderr).contains("unexpected argument '--dry-rnu'"));
     assert!(!run(&["extra"]).status.success());
     assert!(!root.join("data").exists());
     assert!(run(&["--dry-run"]).status.success());

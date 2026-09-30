@@ -4,35 +4,7 @@ use crate::config::{get_config_path, load_config};
 use crate::output;
 use crate::util::validate_app_browser;
 
-pub fn handle_config(args: &[String], dry_run: bool) -> Result<(), Box<dyn Error>> {
-    if args.is_empty() {
-        output::error("Usage: tack config show");
-        output::error("       tack config set <key> <value>");
-        std::process::exit(1);
-    }
-
-    match args[0].as_str() {
-        "show" => {
-            if args.len() != 1 {
-                return Err("Usage: tack config show".into());
-            }
-            show_config()
-        }
-        "set" => {
-            if args.len() != 3 {
-                output::error("Usage: tack config set <key> <value>");
-                std::process::exit(1);
-            }
-            set_config(&args[1], &args[2], dry_run)
-        }
-        _ => {
-            output::error(&format!("Unknown config command: {}", args[0]));
-            std::process::exit(1);
-        }
-    }
-}
-
-fn show_config() -> Result<(), Box<dyn Error>> {
+pub fn show_config() -> Result<(), Box<dyn Error>> {
     let config = load_config();
     let browser = config
         .browser
@@ -46,7 +18,7 @@ fn show_config() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn set_config(key: &str, value: &str, dry_run: bool) -> Result<(), Box<dyn Error>> {
+pub fn set_config(key: &str, value: &str, dry_run: bool) -> Result<(), Box<dyn Error>> {
     if !matches!(key, "browser" | "categories") {
         return Err(format!("Unknown config key: {key}. Use browser or categories.").into());
     }
