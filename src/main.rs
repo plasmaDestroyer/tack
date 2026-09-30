@@ -122,28 +122,42 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 // ── Interactive mode (#19) ──────────────────────────────────────────
 
-fn prompt(label: &str) -> String {
+fn prompt(label: &str) -> Result<String, Box<dyn Error>> {
     print!("{}: ", label);
-    io::stdout().flush().unwrap();
+    io::stdout().flush()?;
     let mut input = String::new();
-    io::stdin().read_line(&mut input).unwrap();
-    input.trim().to_string()
+    if io::stdin().read_line(&mut input)? == 0 {
+        return Err("Input ended. Interactive setup cancelled.".into());
+    }
+    Ok(input.trim().to_string())
+}
+
+fn prompt_choice(label: &str, count: usize, default: usize) -> Result<usize, Box<dyn Error>> {
+    loop {
+        let input = prompt(label)?;
+        if input.is_empty() {
+            return Ok(default);
+        }
+        if let Ok(choice) = input.parse::<usize>()
+            && (1..=count).contains(&choice)
+        {
+            return Ok(choice);
+        }
+        output::warn(&format!("Enter a number between 1 and {count}."));
+    }
 }
 
 fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
     output::info("🔧 tack — interactive setup\n");
 
     // 1. URL — kick off icon fetch in a background thread
-    let url = prompt("Enter the URL");
-    if url.is_empty() {
-        output::error("URL cannot be empty.");
-        std::process::exit(1);
-    }
-    let url = normalize_url(&url);
-    if let Err(msg) = validate_url(&url) {
-        output::error(&msg);
-        std::process::exit(1);
-    }
+    let url = loop {
+        let url = normalize_url(&prompt("Enter the URL")?);
+        match validate_url(&url) {
+            Ok(()) => break url,
+            Err(message) => output::warn(&message),
+        }
+    };
 
     output::info("Fetching favicon in background...");
     let (tx, rx) = std::sync::mpsc::channel::<Option<(Vec<u8>, icon::ImageFormat)>>();
@@ -161,39 +175,28 @@ fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
         for (i, b) in browsers.iter().enumerate() {
             output::info(&format!("  [{}] {}", i + 1, b));
         }
-        let choice = prompt("Pick a browser number (or press Enter for default)");
-        if choice.is_empty() {
-            Some(browsers[0].clone())
-        } else if let Ok(n) = choice.parse::<usize>() {
-            if n >= 1 && n <= browsers.len() {
-                Some(browsers[n - 1].clone())
-            } else {
-                output::warn("Invalid choice — using first detected browser.");
-                Some(browsers[0].clone())
-            }
-        } else {
-            output::warn("Invalid input — using first detected browser.");
-            Some(browsers[0].clone())
-        }
+        let choice = prompt_choice(
+            "Pick a browser number (or press Enter for default)",
+            browsers.len(),
+            1,
+        )?;
+        Some(browsers[choice - 1].clone())
     };
 
-    // 3. Name — typed while the favicon fetch runs in parallel
-    let name = prompt("Enter the app name");
-    if let Err(message) = validate_name(&name) {
-        output::error(&message);
-        std::process::exit(1);
-    }
-
-    // Fail fast if the app already exists
-    let slug = slugify(&name);
     let share_dir = get_share_dir()?;
-    if get_desktop_file_path(&slug, &share_dir).exists() {
-        output::error(&format!(
-            "{} is already installed. Use `tack update {}` to modify it.",
-            name, name
-        ));
-        std::process::exit(1);
-    }
+    let entries = manifest::load_manifest(&manifest::get_manifest_path(&share_dir))?;
+    let name = loop {
+        let name = prompt("Enter the app name")?;
+        if let Err(message) = validate_name(&name) {
+            output::warn(&message);
+        } else if get_desktop_file_path(&slugify(&name), &share_dir).exists()
+            || manifest::find_app_index(&entries, &name).is_some()
+        {
+            output::warn("That app is already installed. Choose another name or use tack update.");
+        } else {
+            break name;
+        }
+    };
 
     // Wait for the background fetch to finish
     let fetched = rx.recv().unwrap_or(None);
@@ -233,30 +236,38 @@ fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
     }
     output::info(&format!("  [{}] Custom local file", custom_num));
     output::info(&format!("  [{}] Use default icon", default_num));
-    let icon_choice = prompt("Pick an option");
+    let icon_choice = prompt_choice(
+        "Pick an option (or press Enter for default)",
+        default_num,
+        fetched_num.unwrap_or(default_num),
+    )?;
 
-    let icon_arg =
-        if fetched_num.is_some() && (icon_choice.trim().is_empty() || icon_choice.trim() == "1") {
-            fetched.map(|(bytes, format)| IconSource::Bytes {
-                bytes,
-                format,
-                user_supplied: false,
-            })
-        } else if icon_choice.trim() == custom_num.to_string() {
-            let path = prompt("Enter the icon file path");
-            if path.is_empty() {
-                output::error("Icon path cannot be empty.");
-                std::process::exit(1);
+    let icon_arg = if Some(icon_choice) == fetched_num {
+        fetched.map(|(bytes, format)| IconSource::Bytes {
+            bytes,
+            format,
+            user_supplied: false,
+        })
+    } else if icon_choice == custom_num {
+        loop {
+            let path = prompt("Enter the icon file path")?;
+            match std::fs::read(&path) {
+                Ok(bytes) => {
+                    if let Some(format) = icon::detect_format(&bytes) {
+                        break Some(IconSource::Bytes {
+                            bytes,
+                            format,
+                            user_supplied: true,
+                        });
+                    }
+                    output::warn("Unsupported icon format. Choose a PNG, SVG, or ICO file.");
+                }
+                Err(error) => output::warn(&format!("Cannot read icon: {error}")),
             }
-            let path_buf = std::path::PathBuf::from(&path);
-            if !path_buf.exists() {
-                output::error(&format!("Icon file not found: {}", path));
-                std::process::exit(1);
-            }
-            Some(IconSource::File(path))
-        } else {
-            Some(IconSource::Default)
-        };
+        }
+    } else {
+        Some(IconSource::Default)
+    };
 
     output::info(""); // blank line before install output
     install_app(&url, &name, false, icon_arg, browser, dry_run)
