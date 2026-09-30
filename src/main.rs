@@ -21,7 +21,10 @@ use commands::remove::remove_app;
 use commands::update::{UpdateFlags, update_all_apps, update_app};
 use desktop::get_desktop_file_path;
 use output::OutputMode;
-use util::{detect_browsers, get_share_dir, normalize_url, slugify, validate_name, validate_url};
+use util::{
+    detect_browsers, get_share_dir, normalize_url, resolve_app_browser, slugify, validate_name,
+    validate_url,
+};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = build_cli().get_matches();
@@ -148,6 +151,9 @@ fn prompt_choice(label: &str, count: usize, default: usize) -> Result<usize, Box
 }
 
 fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
+    if output::is_quiet() {
+        return Err("Interactive setup needs visible choices. Remove --quiet.".into());
+    }
     output::info("🔧 tack — interactive setup\n");
 
     // 1. URL — kick off icon fetch in a background thread
@@ -167,7 +173,12 @@ fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
     });
 
     // 2. Browser (numbered list of detected browsers)
-    let browsers = detect_browsers();
+    let mut browsers = detect_browsers();
+    if let Some(browser) = config::load_config().browser {
+        let browser = resolve_app_browser(&browser)?;
+        browsers.retain(|detected| detected != &browser);
+        browsers.insert(0, browser);
+    }
     let browser = if browsers.is_empty() {
         return Err("No supported browser found on PATH. Install a Chromium-based browser.".into());
     } else {

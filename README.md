@@ -57,7 +57,7 @@ For a guided setup, use `-i` to be prompted step-by-step for the URL, name, brow
 tack -i
 ```
 
-This will show detected browsers as a numbered list and let you choose an icon source (fetch from URL, custom path, or default).
+This shows detected browsers as a numbered list, with your configured browser first, and lets you choose an icon source (fetch from URL, custom path, or default). Invalid entries prompt again; closing input cancels setup. Quiet mode is unavailable during guided setup.
 
 ### Dry Run
 

@@ -53,5 +53,25 @@ fn guided_setup_retries_invalid_input_and_cancels_on_eof() {
     assert!(output.contains("ASCII letter or digit"));
     assert!(output.contains("would create"));
     assert!(!root.join("data").exists());
+
+    let quiet = Command::new(env!("CARGO_BIN_EXE_tack"))
+        .args(["--quiet", "-i"])
+        .env("XDG_DATA_HOME", root.join("data"))
+        .env("XDG_CONFIG_HOME", root.join("config"))
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert!(!quiet.status.success());
+    assert!(String::from_utf8_lossy(&quiet.stderr).contains("Remove --quiet"));
+    assert!(quiet.stdout.is_empty());
+
+    let config = root.join("config/tack/config.toml");
+    std::fs::create_dir_all(config.parent().unwrap()).unwrap();
+    std::fs::write(config, "browser = \"/bin/true\"\n").unwrap();
+    let configured = run(b"localhost\n\nConfigured\n\n", false);
+    assert!(configured.status.success(), "{configured:?}");
+    let entries: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(root.join("data/tack/apps.json")).unwrap()).unwrap();
+    assert_eq!(entries[0]["browser"], "/bin/true");
     std::fs::remove_dir_all(root).unwrap();
 }
