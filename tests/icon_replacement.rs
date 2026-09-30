@@ -70,6 +70,7 @@ fn replacing_icon_format_removes_old_managed_file() {
         serde_json::from_slice(&std::fs::read(root.join("data/tack/apps.json")).unwrap()).unwrap();
     assert_eq!(manifest[0]["icon_path"], managed_svg.to_str().unwrap());
     assert_eq!(manifest[0]["user_supplied_icon"], true);
+    assert!(!managed_png.exists());
     assert_eq!(
         std::fs::read(&managed_svg).unwrap(),
         std::fs::read(&source_svg).unwrap()
@@ -98,6 +99,26 @@ fn replacing_icon_format_removes_old_managed_file() {
     );
     assert!(managed_svg.exists());
     assert!(!managed_png.exists());
+
+    let unrelated = root.join("data/icons/unrelated.png");
+    std::fs::copy(source_png, &unrelated).unwrap();
+    std::fs::copy(source_png, &managed_png).unwrap();
+    assert!(run(&["update", "--all", "--dry-run"]).status.success());
+    assert!(managed_png.exists());
+    assert!(run(&["update", "--all"]).status.success());
+    assert!(!managed_png.exists());
+    assert!(managed_svg.exists());
+    assert!(unrelated.exists());
+
+    std::fs::copy(source_png, &managed_png).unwrap();
+    assert!(run(&["remove", "Demo", "--dry-run"]).status.success());
+    assert!(managed_png.exists());
+    assert!(managed_svg.exists());
+    assert!(run(&["remove", "Demo"]).status.success());
+    assert!(!managed_png.exists());
+    assert!(!managed_svg.exists());
+    assert!(unrelated.exists());
+    assert!(source_svg.exists());
 
     std::fs::remove_dir_all(root).unwrap();
 }

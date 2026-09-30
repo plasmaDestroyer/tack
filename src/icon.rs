@@ -221,29 +221,23 @@ pub fn save_icon(
     Ok(icon_path)
 }
 
-pub fn remove_replaced_icon(
-    old_icon: &str,
-    new_icon: &Path,
-    slug: &str,
-    share_dir: &Path,
-    dry_run: bool,
-) {
-    let old = Path::new(old_icon);
-    let icons_dir = share_dir.join("icons");
-    if old == new_icon
-        || !old.exists()
-        || (old != icons_dir.join(format!("{slug}.png"))
-            && old != icons_dir.join(format!("{slug}.svg")))
-    {
+pub fn cleanup_app_icons(slug: &str, keep: Option<&Path>, share_dir: &Path, dry_run: bool) {
+    if slug.is_empty() || crate::util::slugify(slug) != slug {
         return;
     }
-    if dry_run {
-        output::dry_run(&format!("would remove old icon: {}", old.display()));
-    } else if let Err(error) = std::fs::remove_file(old) {
-        output::warn(&format!(
-            "Could not remove old icon {}: {error}",
-            old.display()
-        ));
+    for extension in ["png", "svg"] {
+        let path = share_dir.join("icons").join(format!("{slug}.{extension}"));
+        if keep == Some(path.as_path()) || !path.exists() {
+            continue;
+        }
+        if dry_run {
+            output::dry_run(&format!("would remove unused icon: {}", path.display()));
+        } else if let Err(error) = std::fs::remove_file(&path) {
+            output::warn(&format!(
+                "Could not remove unused icon {}: {error}",
+                path.display()
+            ));
+        }
     }
 }
 
@@ -256,5 +250,28 @@ pub fn detect_format(bytes: &[u8]) -> Option<ImageFormat> {
         Some(ImageFormat::Ico)
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cleanup_rejects_slugs_that_escape_the_icons_directory() {
+        let root = std::env::temp_dir().join(format!(
+            "tack-icon-cleanup-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(root.join("icons")).unwrap();
+        let outside = root.join("outside.png");
+        std::fs::write(&outside, DEFAULT_ICON).unwrap();
+        cleanup_app_icons("../outside", None, &root, false);
+        assert!(outside.exists());
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

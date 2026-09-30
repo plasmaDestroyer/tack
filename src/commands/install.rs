@@ -3,7 +3,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::desktop::{create_desktop_file, get_desktop_file_path};
 use crate::icon::{
-    DEFAULT_ICON, ImageFormat, detect_format, fetch_favicon, remove_replaced_icon, save_icon,
+    DEFAULT_ICON, ImageFormat, cleanup_app_icons, detect_format, fetch_favicon, save_icon,
 };
 use crate::manifest::{
     AppEntry, add_or_update_app, find_app_index, get_manifest_path, load_manifest, lock_manifest,
@@ -99,7 +99,6 @@ pub fn install_app(
         return Err(format!("App '{}' is already installed.", name).into());
     }
     let existing = entries.iter().find(|entry| entry.slug == slug);
-    let old_icon = existing.map(|entry| entry.icon_path.clone());
 
     let mut user_supplied_icon = false;
 
@@ -196,9 +195,7 @@ pub fn install_app(
         user_supplied_icon,
     };
     add_or_update_app(&manifest_path, entry, dry_run)?;
-    if let Some(old_icon) = old_icon {
-        remove_replaced_icon(&old_icon, &icon_path, &slug, &share_dir, dry_run);
-    }
+    cleanup_app_icons(&slug, Some(&icon_path), &share_dir, dry_run);
     if !dry_run {
         output::info(&format!("Manifest updated at: {}", manifest_path.display()));
         output::success(&format!("✓ {} installed successfully!", name));

@@ -137,6 +137,8 @@ tack remove YouTube
 
 This removes the `.desktop` file, the saved icon (if managed by tack), and the app's entry from the manifest.
 
+Install, update, and remove also clean up unused PNG/SVG variants left by older Tack versions for that app. Run `tack update --all` to clean existing apps; custom icons are preserved.
+
 ### Manage Configuration
 
 You can use `tack config` to manage default behaviors like the default browser and default categories for the generated `.desktop` files. The config is saved at `~/.config/tack/config.toml`.

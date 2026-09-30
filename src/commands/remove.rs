@@ -1,7 +1,7 @@
 use std::error::Error;
-use std::path::Path;
 
 use crate::desktop::get_desktop_file_path;
+use crate::icon::cleanup_app_icons;
 use crate::manifest::{
     find_app_index, get_manifest_path, load_manifest, lock_manifest, save_manifest,
 };
@@ -42,23 +42,8 @@ pub fn remove_app(name: &str, dry_run: bool) -> Result<(), Box<dyn Error>> {
         }
     }
 
-    // Delete icon only if it lives inside share_dir/icons/ (i.e. managed by tack)
-    let icons_dir = share_dir.join("icons");
-    let icon_path = Path::new(&entry.icon_path);
-    if icon_path.exists() {
-        if icon_path.starts_with(&icons_dir) {
-            if dry_run {
-                output::dry_run(&format!("would remove: {}", entry.icon_path));
-            } else {
-                std::fs::remove_file(icon_path)?;
-                output::info(&format!("Removed icon: {}", entry.icon_path));
-            }
-        } else {
-            output::info(&format!("Skipping user-supplied icon: {}", entry.icon_path));
-        }
-    }
-
     save_manifest(&manifest_path, &entries, dry_run)?;
+    cleanup_app_icons(&entry.slug, None, &share_dir, dry_run);
     if dry_run {
         return Ok(());
     }
