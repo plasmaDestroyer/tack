@@ -51,6 +51,13 @@ fn global_flags_work_before_commands() {
     assert!(run(&["update", "--dry-run", "--all"]).status.success());
     assert!(run(&["--dry-run", "remove", "Demo"]).status.success());
     assert_eq!(std::fs::read(&manifest).unwrap(), before);
+
+    let completions = run(&["completions", "fish"]);
+    let verbose_completions = run(&["--verbose", "completions", "fish"]);
+    assert!(completions.status.success());
+    assert!(verbose_completions.status.success());
+    assert!(!completions.stdout.is_empty());
+    assert_eq!(verbose_completions.stdout, completions.stdout);
     let quiet = run(&["--quiet", "list"]);
     assert!(quiet.status.success());
     assert!(quiet.stdout.is_empty());

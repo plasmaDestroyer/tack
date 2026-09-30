@@ -4,8 +4,6 @@ use std::io;
 use clap::{Arg, Command};
 use clap_complete::{Shell, generate};
 
-use crate::output;
-
 /// Shared CLI definition for parsing, help, completions, and man pages.
 pub fn build_cli() -> Command {
     Command::new("tack")
@@ -185,8 +183,6 @@ pub fn build_cli() -> Command {
 pub fn generate_completions(shell: Shell) {
     let mut cmd = build_cli();
     generate(shell, &mut cmd, "tack", &mut io::stdout());
-
-    output::verbose(&format!("Generated {} completions.", shell));
 }
 
 pub fn generate_manpage() -> Result<(), Box<dyn Error>> {
