@@ -98,10 +98,8 @@ pub fn install_app(
     if find_app_index(&entries, name).is_some_and(|index| !force || entries[index].slug != slug) {
         return Err(format!("App '{}' is already installed.", name).into());
     }
-    let old_icon = entries
-        .iter()
-        .find(|entry| entry.slug == slug)
-        .map(|entry| entry.icon_path.clone());
+    let existing = entries.iter().find(|entry| entry.slug == slug);
+    let old_icon = existing.map(|entry| entry.icon_path.clone());
 
     let mut user_supplied_icon = false;
 
@@ -136,7 +134,13 @@ pub fn install_app(
             let cached_png = icons_dir.join(format!("{}.png", slug));
             let cached_svg = icons_dir.join(format!("{}.svg", slug));
 
-            if cached_png.exists() {
+            if let Some(existing) = existing
+                && std::path::Path::new(&existing.icon_path).is_file()
+            {
+                output::info(&format!("Found installed icon: {}", existing.icon_path));
+                user_supplied_icon = existing.user_supplied_icon;
+                std::path::PathBuf::from(&existing.icon_path)
+            } else if cached_png.exists() {
                 output::info(&format!("Found cached icon: {}", cached_png.display()));
                 cached_png
             } else if cached_svg.exists() {

@@ -53,6 +53,28 @@ fn replacing_icon_format_removes_old_managed_file() {
     assert!(managed_svg.exists());
     assert!(!managed_png.exists());
 
+    // A legacy cached PNG must not replace the recorded custom SVG on --force.
+    std::fs::copy(source_png, &managed_png).unwrap();
+    assert!(
+        run(&[
+            "https://example.com",
+            "Demo",
+            "--force",
+            "--browser",
+            "/bin/true"
+        ])
+        .status
+        .success()
+    );
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(root.join("data/tack/apps.json")).unwrap()).unwrap();
+    assert_eq!(manifest[0]["icon_path"], managed_svg.to_str().unwrap());
+    assert_eq!(manifest[0]["user_supplied_icon"], true);
+    assert_eq!(
+        std::fs::read(&managed_svg).unwrap(),
+        std::fs::read(&source_svg).unwrap()
+    );
+
     assert!(
         run(&["update", "Demo", "--icon", source_png])
             .status
