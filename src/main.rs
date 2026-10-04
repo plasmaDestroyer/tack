@@ -27,7 +27,14 @@ use util::{
     validate_url,
 };
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() {
+    if let Err(error) = run() {
+        output::error(&format!("Error: {}", error.to_string().escape_debug()));
+        std::process::exit(1);
+    }
+}
+
+fn run() -> Result<(), Box<dyn Error>> {
     let args = build_cli().get_matches();
     if args.get_flag("quiet") && args.get_flag("verbose") {
         build_cli()

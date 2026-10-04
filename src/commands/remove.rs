@@ -18,15 +18,9 @@ pub fn remove_app(name: &str, dry_run: bool) -> Result<(), Box<dyn Error>> {
     };
 
     let mut entries = load_manifest(&manifest_path)?;
-    let position = find_app_index(&entries, name);
-
-    let entry = match position {
-        Some(i) => entries.remove(i),
-        None => {
-            output::error(&format!("App '{}' is not installed.", name));
-            std::process::exit(1);
-        }
-    };
+    let position = find_app_index(&entries, name)
+        .ok_or_else(|| format!("App '{}' is not installed.", name))?;
+    let entry = entries.remove(position);
 
     // Delete .desktop file
     let desktop_file_path = get_desktop_file_path(&entry.slug, &share_dir)?;

@@ -1,3 +1,4 @@
+use std::io::IsTerminal;
 use std::sync::atomic::{AtomicU8, Ordering};
 
 // ANSI color codes
@@ -29,8 +30,8 @@ pub fn output_mode() -> OutputMode {
     }
 }
 
-fn use_color() -> bool {
-    std::env::var("NO_COLOR").is_err()
+fn use_color(terminal: bool) -> bool {
+    terminal && std::env::var_os("NO_COLOR").is_none()
 }
 
 pub fn is_quiet() -> bool {
@@ -46,7 +47,7 @@ pub fn success(msg: &str) {
     if is_quiet() {
         return;
     }
-    if use_color() {
+    if use_color(std::io::stdout().is_terminal()) {
         println!("{BOLD}{GREEN}{msg}{RESET}");
     } else {
         println!("{msg}");
@@ -66,7 +67,7 @@ pub fn warn(msg: &str) {
     if is_quiet() {
         return;
     }
-    if use_color() {
+    if use_color(std::io::stdout().is_terminal()) {
         println!("{YELLOW}{msg}{RESET}");
     } else {
         println!("{msg}");
@@ -75,7 +76,7 @@ pub fn warn(msg: &str) {
 
 /// Print an error message (red) — always shown, goes to stderr
 pub fn error(msg: &str) {
-    if use_color() {
+    if use_color(std::io::stderr().is_terminal()) {
         eprintln!("{RED}{msg}{RESET}");
     } else {
         eprintln!("{msg}");
@@ -87,7 +88,7 @@ pub fn verbose(msg: &str) {
     if !is_verbose() {
         return;
     }
-    if use_color() {
+    if use_color(std::io::stdout().is_terminal()) {
         println!("  {BOLD}{msg}{RESET}");
     } else {
         println!("  {msg}");
@@ -96,7 +97,7 @@ pub fn verbose(msg: &str) {
 
 /// Print a dry-run message (yellow) — always shown
 pub fn dry_run(msg: &str) {
-    if use_color() {
+    if use_color(std::io::stdout().is_terminal()) {
         println!("{YELLOW}[dry-run]{RESET} {msg}");
     } else {
         println!("[dry-run] {msg}");

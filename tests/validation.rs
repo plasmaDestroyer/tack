@@ -30,6 +30,26 @@ fn install_rejects_unusable_names_and_urls_before_writing() {
         assert!(!run(url, name).status.success(), "{url} {name}");
     }
     assert!(!root.join("data").exists());
+    let invalid = run("ftp://example.com", "Bad Scheme");
+    assert!(String::from_utf8_lossy(&invalid.stderr).starts_with("Error: Invalid URL"));
+
+    let redirected = Command::new(env!("CARGO_BIN_EXE_tack"))
+        .args([
+            "https://example.com",
+            "Preview",
+            "--default-icon",
+            "--browser",
+            "/bin/true",
+            "--dry-run",
+        ])
+        .env("XDG_DATA_HOME", root.join("data"))
+        .env("XDG_CONFIG_HOME", root.join("config"))
+        .env_remove("NO_COLOR")
+        .output()
+        .unwrap();
+    assert!(redirected.status.success());
+    assert!(!redirected.stdout.contains(&0x1b));
+    assert!(!redirected.stderr.contains(&0x1b));
 
     assert!(
         run("HTTPS://example.com/path?x=1", "Valid App")
