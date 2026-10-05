@@ -52,6 +52,15 @@ To specify a browser explicitly instead of relying on auto-detection:
 tack https://youtube.com YouTube --browser brave-browser
 ```
 
+Some browsers render `--app=URL` windows badly (e.g. Brave Origin on Wayland freezes page updates). Use the browser's own installed web app instead:
+
+```bash
+tack https://open.spotify.com Spotify --web-app          # opens the site; click "Install app", tack takes over the launcher
+tack https://open.spotify.com Spotify --web-app APP_ID   # adopt an app the browser already installed
+```
+
+The app id is the 32-letter part of the browser's launcher name (`brave-APP_ID-Default.desktop`). `tack remove` keeps the web app installed in the browser.
+
 ### Interactive Mode
 
 For a guided setup, use `-i` to be prompted step-by-step for the URL, name, browser, and icon:

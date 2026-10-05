@@ -43,6 +43,15 @@ pub fn build_cli() -> Command {
                 .help("Browser to use (e.g. chromium, brave-browser)"),
         )
         .arg(
+            Arg::new("web-app")
+                .long("web-app")
+                .requires("app")
+                .value_name("APP_ID")
+                .num_args(0..=1)
+                .default_missing_value("")
+                .help("Use the browser's own installed web app (waits for you to click Install app, or adopts APP_ID)"),
+        )
+        .arg(
             Arg::new("default-icon")
                 .long("default-icon")
                 .requires("app")

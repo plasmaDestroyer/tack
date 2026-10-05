@@ -133,6 +133,7 @@ fn run() -> Result<(), Box<dyn Error>> {
                             .map(IconSource::File)
                     },
                     args.get_one::<String>("browser").cloned(),
+                    args.get_one::<String>("web-app").cloned(),
                     dry_run,
                 )?;
             } else {
@@ -302,7 +303,7 @@ fn run_interactive(dry_run: bool) -> Result<(), Box<dyn Error>> {
     };
 
     output::info(""); // blank line before install output
-    install_app(&url, &name, false, icon_arg, browser, dry_run)
+    install_app(&url, &name, false, icon_arg, browser, None, dry_run)
 }
 
 /// Fetch the favicon off the main thread. Returns (bytes, format) on success.

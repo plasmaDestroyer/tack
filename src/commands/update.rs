@@ -131,6 +131,7 @@ pub fn update_app(
         &icon_path,
         &entry.url,
         &entry.browser,
+        entry.web_app(),
         config.categories.as_deref(),
         &desktop_file_path,
         dry_run,

@@ -2,6 +2,7 @@ use std::error::Error;
 use std::os::unix::process::CommandExt;
 use std::process::Stdio;
 
+use crate::desktop::launch_args;
 use crate::manifest::{find_app_index, get_manifest_path, load_manifest};
 use crate::output;
 use crate::util::{get_share_dir, resolve_app_browser};
@@ -25,7 +26,7 @@ pub fn open_app(name: &str, dry_run: bool) -> Result<(), Box<dyn Error>> {
 
     unsafe {
         std::process::Command::new(&browser)
-            .arg(format!("--app={}", entry.url))
+            .args(launch_args(&entry.url, entry.web_app()))
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())

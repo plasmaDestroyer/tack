@@ -47,6 +47,8 @@ pub fn import_apps(
                 true,
                 icon,
                 Some(browser.unwrap_or(&app.browser).to_string()),
+                // ponytail: web apps import as --app windows; the target browser may not have them installed.
+                None,
                 dry_run,
             )
         })();

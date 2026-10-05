@@ -42,6 +42,11 @@ pub fn remove_app(name: &str, dry_run: bool) -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
     output::info("Manifest updated.");
+    if entry.app_id.is_some() {
+        output::info(
+            "The web app stays installed in the browser. Uninstall it from the browser's apps page if not needed.",
+        );
+    }
 
     output::success(&format!("✓ {} removed successfully!", name));
     Ok(())

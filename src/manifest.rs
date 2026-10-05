@@ -17,6 +17,20 @@ pub struct AppEntry {
     pub installed_at: u64,
     #[serde(default)]
     pub user_supplied_icon: bool,
+    /// Browser-installed web app (`--app-id`) instead of a plain `--app=URL` window.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile: Option<String>,
+}
+
+impl AppEntry {
+    pub fn web_app(&self) -> Option<(&str, &str)> {
+        Some((
+            self.app_id.as_deref()?,
+            self.profile.as_deref().unwrap_or("Default"),
+        ))
+    }
 }
 
 pub fn get_manifest_path(share_dir: &Path) -> PathBuf {
@@ -106,6 +120,8 @@ mod tests {
             icon_path: "/tmp/demo.png".into(),
             installed_at: 0,
             user_supplied_icon: false,
+            app_id: None,
+            profile: None,
         }];
         save_manifest(&path, &entries, false).unwrap();
         assert_eq!(load_manifest(&path).unwrap()[0].name, "Demo");
