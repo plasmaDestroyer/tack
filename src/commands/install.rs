@@ -7,7 +7,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::desktop::{create_desktop_file, get_desktop_file_path};
 use crate::icon::{
-    DEFAULT_ICON, ImageFormat, cleanup_app_icons, detect_format, fetch_favicon, save_icon,
+    DEFAULT_ICON, ImageFormat, cleanup_app_icons, detect_format, fetch_favicon, is_usable_icon,
+    save_icon,
 };
 use crate::manifest::{
     AppEntry, add_or_update_app, find_app_index, get_manifest_path, load_manifest, lock_manifest,
@@ -132,15 +133,15 @@ pub fn install_app(
             let cached_svg = icons_dir.join(format!("{}.svg", slug));
 
             if let Some(existing) = existing
-                && std::path::Path::new(&existing.icon_path).is_file()
+                && is_usable_icon(std::path::Path::new(&existing.icon_path))
             {
                 output::info(&format!("Found installed icon: {}", existing.icon_path));
                 user_supplied_icon = existing.user_supplied_icon;
                 std::path::PathBuf::from(&existing.icon_path)
-            } else if cached_png.exists() {
+            } else if is_usable_icon(&cached_png) {
                 output::info(&format!("Found cached icon: {}", cached_png.display()));
                 cached_png
-            } else if cached_svg.exists() {
+            } else if is_usable_icon(&cached_svg) {
                 output::info(&format!("Found cached icon: {}", cached_svg.display()));
                 cached_svg
             } else {

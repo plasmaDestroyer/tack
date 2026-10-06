@@ -188,6 +188,11 @@ pub fn fetch_favicon(url: &str) -> Option<Vec<u8>> {
     fetch_icon(&client, &google_api_url)
 }
 
+/// A saved bundled icon is a fetch fallback, so callers fetch again instead of reusing it.
+pub fn is_usable_icon(path: &Path) -> bool {
+    std::fs::read(path).is_ok_and(|bytes| bytes != DEFAULT_ICON)
+}
+
 pub fn save_icon(
     slug: &str,
     bytes: &[u8],

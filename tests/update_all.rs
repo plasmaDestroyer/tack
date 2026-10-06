@@ -10,7 +10,14 @@ fn update_all_reports_partial_failure() {
             .unwrap()
             .as_nanos()
     ));
-    let icon = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/default.png");
+    // Custom icon must differ from the bundled one, which tack treats as a failed fetch.
+    std::fs::create_dir_all(&root).unwrap();
+    let icon_path = root.join("custom.png");
+    let mut bytes =
+        std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/default.png")).unwrap();
+    bytes.push(0);
+    std::fs::write(&icon_path, bytes).unwrap();
+    let icon = icon_path.to_str().unwrap();
     let run = |args: &[&str]| {
         Command::new(env!("CARGO_BIN_EXE_tack"))
             .args(args)

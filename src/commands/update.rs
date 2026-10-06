@@ -88,7 +88,10 @@ pub fn update_app(
             return Err(format!("Icon file not found: {}", icon_arg).into());
         }
     } else if !has_overrides {
-        if entry.user_supplied_icon {
+        // A "custom" icon equal to the bundled one came from a failed fetch, so fetch again.
+        if entry.user_supplied_icon
+            && std::fs::read(&entry.icon_path).ok().as_deref() != Some(DEFAULT_ICON)
+        {
             if !PathBuf::from(&entry.icon_path).is_file() {
                 return Err(
                     "Custom icon is missing. Restore it with --icon PATH or use --default-icon."
@@ -119,6 +122,7 @@ pub fn update_app(
                 output::info(&format!("Icon saved at: {}", icon_path.display()));
             }
             entry.icon_path = icon_path.display().to_string();
+            entry.user_supplied_icon = false;
         }
     }
 
